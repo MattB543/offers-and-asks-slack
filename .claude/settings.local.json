@@ -9,7 +9,9 @@
       "Bash(chmod:*)",
       "Bash(rm:*)",
       "Bash(npm uninstall:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(timeout:*)",
+      "Bash(echo \"Exit code: $?\")"
     ],
     "deny": []
   }

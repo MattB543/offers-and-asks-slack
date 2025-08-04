@@ -1,10 +1,10 @@
 import { config } from 'dotenv';
 import Bree from 'bree';
 import path from 'path';
-import { app } from './app.js';
-import { db } from './lib/database.js';
-import { embeddingService } from './lib/openai.js';
-import { errorHandler } from './utils/errorHandler.js';
+import { app } from './app';
+import { db } from './lib/database';
+import { embeddingService } from './lib/openai';
+import { errorHandler } from './utils/errorHandler';
 
 config();
 

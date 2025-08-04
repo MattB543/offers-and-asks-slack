@@ -1,0 +1,48 @@
+{
+  "name": "Helper Matcher Slack Bot",
+  "description": "A Slack bot that matches team members who need help with those who have the right skills using AI embeddings and vector similarity search.",
+  "repository": "https://github.com/your-username/offers-and-asks-slack",
+  "logo": "",
+  "keywords": ["slack", "bot", "ai", "matching", "skills", "postgresql", "vector", "embeddings"],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    },
+    "SLACK_BOT_TOKEN": {
+      "description": "Slack Bot User OAuth Token (starts with xoxb-)",
+      "required": true
+    },
+    "SLACK_SIGNING_SECRET": {
+      "description": "Slack App Signing Secret",
+      "required": true
+    },
+    "OPENAI_API_KEY": {
+      "description": "OpenAI API key for generating embeddings",
+      "required": true
+    },
+    "ADMIN_USER_ID": {
+      "description": "Slack User ID for admin notifications",
+      "required": true
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini"
+    }
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "scripts": {
+    "postdeploy": "npm run setup-db && npm run seed-skills -- seed-sample"
+  }
+}

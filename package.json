@@ -1,0 +1,35 @@
+{
+  "name": "offers-and-asks-slack",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "setup-db": "ts-node src/scripts/setup-database.ts",
+    "seed-skills": "ts-node src/scripts/seed-skills.ts",
+    "weekly-prompt": "ts-node src/jobs/weekly-prompt.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.2.0",
+    "@types/pg": "^8.15.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.4.0",
+    "bree": "^9.2.4",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "fast-csv": "^5.0.5",
+    "openai": "^5.11.0",
+    "pg": "^8.16.3"
+  }
+}

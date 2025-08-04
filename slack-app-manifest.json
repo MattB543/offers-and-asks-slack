@@ -1,0 +1,43 @@
+{
+  "display_information": {
+    "name": "Helper Matcher",
+    "description": "AI-powered skill matching to connect team members who need help with those who have the right expertise",
+    "background_color": "#2c3e50"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": false
+    },
+    "bot_user": {
+      "display_name": "Helper Matcher",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "im:write",
+        "conversations:open",
+        "users:read",
+        "channels:read",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://YOUR-DOMAIN/slack/events",
+      "bot_events": [
+        "app_home_opened",
+        "message.im"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://YOUR-DOMAIN/slack/events"
+    },
+    "socket_mode_enabled": false
+  }
+}

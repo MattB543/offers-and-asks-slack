@@ -22,12 +22,16 @@ A Slack bot that intelligently matches team members who need help with those who
 
 ## Quick Start
 
+> **🎯 Fastest Path**: Use the automated setup script: `./setup.sh`
+
 ### Prerequisites
 
 - Node.js 18+
 - PostgreSQL 15+ with pgvector extension
 - Slack workspace with bot permissions
 - OpenAI API key
+
+> **💡 Cloud Deployment**: Skip local setup entirely! Deploy directly to DigitalOcean/Heroku/Railway and use their managed PostgreSQL.
 
 ### 1. Clone and Install
 
@@ -138,36 +142,28 @@ npm run weekly-prompt         # Run weekly prompt job manually
 
 ## Deployment
 
-### DigitalOcean App Platform
+### 🚀 **Simple Deployment (Recommended)**
 
+**DigitalOcean App Platform** ($3/month)
 1. Fork this repository
-2. Create a new App in DO App Platform
-3. Connect your GitHub repository
-4. Configure environment variables
-5. Add PostgreSQL database addon
-6. Deploy!
+2. Create new App → Connect GitHub repo
+3. Set environment variables in dashboard
+4. Deploy! (Auto-detected as Node.js app)
 
-The app includes a `.do/app.yaml` configuration file for automated setup.
-
-### Heroku
-
-1. Fork this repository
-2. Create new Heroku app
+**Heroku** ($7/month)
+1. Fork this repository  
+2. Create new Heroku app → Connect GitHub
 3. Add Heroku Postgres addon
-4. Configure environment variables
-5. Deploy from GitHub
+4. Deploy! (One-click with `app.json`)
 
-The app includes an `app.json` file for one-click deployment.
+**Railway** ($5/month)
+1. Connect GitHub repo
+2. Add PostgreSQL service
+3. Set environment variables
+4. Deploy automatically
 
-### Docker
+> **Zero complexity!** These platforms auto-detect Node.js and handle everything.
 
-```bash
-# Build image
-docker build -t helper-matcher .
-
-# Run container
-docker run -p 3000:3000 --env-file .env helper-matcher
-```
 
 ## Skills Management
 

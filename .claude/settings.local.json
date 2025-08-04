@@ -6,7 +6,10 @@
       "Bash(npx tsc:*)",
       "Bash(mkdir:*)",
       "Bash(npm run build:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(rm:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

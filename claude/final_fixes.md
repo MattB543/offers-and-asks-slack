@@ -94,11 +94,7 @@ export class Database {
 
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      // Production environments like DigitalOcean and Heroku often require SSL
-      // The connection string usually handles this, but you can be explicit if needed.
-      ssl: process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: false } // A common setting for managed DBs, but check your provider's docs
-        : false,
+      ssl: { rejectUnauthorized: false }
     });
   }
 

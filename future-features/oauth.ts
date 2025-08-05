@@ -8,7 +8,6 @@ export const installer = new InstallProvider({
   clientId: process.env.SLACK_CLIENT_ID!,
   clientSecret: process.env.SLACK_CLIENT_SECRET!,
   stateSecret: process.env.SLACK_STATE_SECRET || 'my-state-secret-change-this',
-  scopes: ['chat:write', 'im:write', 'users:read', 'channels:read', 'commands'],
   installationStore: {
     // Store installation data in your database
     storeInstallation: async (installation) => {
@@ -43,7 +42,8 @@ export const handleOAuthStart = async (req: any, res: any) => {
     res.redirect(url);
   } catch (error) {
     console.error('Error generating install URL:', error);
-    res.status(500).send('Error generating installation URL');
+    res.statusCode = 500;
+    res.end('Error generating installation URL');
   }
 };
 
@@ -52,14 +52,15 @@ export const handleOAuthRedirect = async (req: any, res: any) => {
     // Handle the OAuth callback
     await installer.handleCallback(req, res, {
       success: (installation, options, req, res) => {
-        res.send('Success! The app has been installed to your workspace. You can close this window.');
+        res.end('Success! The app has been installed to your workspace. You can close this window.');
       },
       failure: (error, options, req, res) => {
-        res.send('Installation failed. Please try again or contact support.');
+        res.end('Installation failed. Please try again or contact support.');
       },
     });
   } catch (error) {
     console.error('OAuth error:', error);
-    res.status(500).send('Installation failed');
+    res.statusCode = 500;
+    res.end('Installation failed');
   }
 };

@@ -89,3 +89,8 @@ data/
 # Temporary files
 tmp/
 temp/
+
+# Claude Code files (debugging/improvement files)
+claude/
+build_errors.md
+secrets.md

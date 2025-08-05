@@ -1,6 +1,6 @@
 {
   "display_information": {
-    "name": "Helper Matcher",
+    "name": "Offers and Asks",
     "description": "AI-powered skill matching to connect team members who need help with those who have the right expertise",
     "background_color": "#2c3e50"
   },
@@ -10,7 +10,7 @@
       "messages_tab_enabled": false
     },
     "bot_user": {
-      "display_name": "Helper Matcher",
+      "display_name": "Offers and Asks",
       "always_online": true
     }
   },
@@ -29,10 +29,7 @@
   "settings": {
     "event_subscriptions": {
       "request_url": "https://YOUR-DOMAIN/slack/events",
-      "bot_events": [
-        "app_home_opened",
-        "message.im"
-      ]
+      "bot_events": ["app_home_opened", "message.im"]
     },
     "interactivity": {
       "is_enabled": true,

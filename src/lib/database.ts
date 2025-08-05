@@ -7,16 +7,12 @@ export class Database {
 
   constructor() {
     if (!process.env.DATABASE_URL) {
-      throw new Error('DATABASE_URL environment variable is not set.');
+      throw new Error("DATABASE_URL environment variable is not set.");
     }
 
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      // Production environments like DigitalOcean and Heroku often require SSL
-      // The connection string usually handles this, but you can be explicit if needed.
-      ssl: process.env.NODE_ENV === 'production'
-        ? { rejectUnauthorized: false } // A common setting for managed DBs, but check your provider's docs
-        : false,
+      ssl: { rejectUnauthorized: false },
     });
   }
 
@@ -94,7 +90,7 @@ export class Database {
     embedding: number[]
   ): Promise<void> {
     await this.query("UPDATE skills SET embedding = $1::vector WHERE id = $2", [
-      `[${embedding.join(',')}]`,
+      `[${embedding.join(",")}]`,
       skillId,
     ]);
   }
@@ -143,7 +139,7 @@ export class Database {
   ): Promise<number> {
     const result = await this.query(
       "INSERT INTO weekly_needs (slack_id, need_text, need_embedding, week_start) VALUES ($1, $2, $3::vector, $4) RETURNING id",
-      [slackId, needText, `[${needEmbedding.join(',')}]`, weekStart]
+      [slackId, needText, `[${needEmbedding.join(",")}]`, weekStart]
     );
     return result.rows[0].id;
   }
@@ -165,7 +161,7 @@ export class Database {
       ORDER BY score DESC
       LIMIT $2
     `,
-      [`[${needEmbedding.join(',')}]`, limit]
+      [`[${needEmbedding.join(",")}]`, limit]
     );
     return result.rows;
   }

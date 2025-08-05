@@ -8,89 +8,62 @@ export class Database {
   constructor() {
     console.log("🔧 Database constructor starting...");
 
-    const dbUrl = process.env.DATABASE_URL;
+    let dbUrl = process.env.DATABASE_URL;
     console.log("📊 DATABASE_URL exists:", !!dbUrl);
-    console.log("📊 DATABASE_URL length:", dbUrl?.length || 0);
-    console.log(
-      "📊 DATABASE_URL starts with:",
-      dbUrl?.substring(0, 20) + "..."
-    );
+    console.log("📊 Original DATABASE_URL:", dbUrl?.substring(0, 50) + "...");
 
     if (!dbUrl) {
       throw new Error("DATABASE_URL environment variable is not set.");
     }
 
-    // Parse the URL to see what we're connecting to
-    try {
-      const urlParts = dbUrl.match(
-        /postgresql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)/
-      );
-      if (urlParts) {
-        console.log("📊 DB Host:", urlParts[3]);
-        console.log("📊 DB Port:", urlParts[4]);
-        console.log("📊 DB Name:", urlParts[5]);
-        console.log("📊 DB User:", urlParts[1]);
-      }
-    } catch (e) {
-      console.log("⚠️ Could not parse DATABASE_URL");
-    }
-
+    // Check if this is a DigitalOcean database
+    const isDigitalOcean = dbUrl.includes("ondigitalocean.com");
+    console.log("📊 Is DigitalOcean database:", isDigitalOcean);
     console.log("📊 NODE_ENV:", process.env.NODE_ENV);
-    console.log(
-      "📊 NODE_ENV === 'production':",
-      process.env.NODE_ENV === "production"
-    );
 
-    // Try different SSL configurations
-    let sslConfig: any;
-
-    // Check if we're in production
-    const isProduction = process.env.NODE_ENV === "production";
-    console.log("📊 isProduction:", isProduction);
-
-    if (isProduction) {
-      console.log("🔐 Setting up PRODUCTION SSL config");
-
-      // For DigitalOcean, we need to handle their SSL differently
-      // Try multiple approaches
-      sslConfig = {
-        rejectUnauthorized: false,
-        require: true,
-      };
-
-      console.log("🔐 SSL Config being used:", JSON.stringify(sslConfig));
-    } else {
-      console.log("🔐 Setting up DEVELOPMENT SSL config (false)");
-      sslConfig = false;
+    // IMPORTANT: Remove any existing SSL params from the connection string
+    // because we'll handle SSL via the config object
+    if (dbUrl.includes("?sslmode=")) {
+      console.log("⚠️ Removing sslmode from DATABASE_URL to avoid conflicts");
+      dbUrl = dbUrl.split("?")[0];
+      console.log("📊 Cleaned DATABASE_URL:", dbUrl?.substring(0, 50) + "...");
     }
 
-    console.log("📊 Final SSL config type:", typeof sslConfig);
-    console.log("📊 Final SSL config value:", JSON.stringify(sslConfig));
+    // For DigitalOcean, use a specific SSL configuration
+    let poolConfig: any;
 
-    // Create the pool with extensive logging
-    const poolConfig = {
-      connectionString: dbUrl,
-      ssl: sslConfig,
-    };
+    if (isDigitalOcean || process.env.NODE_ENV === "production") {
+      console.log("🔐 Using DigitalOcean/Production SSL configuration");
 
-    console.log("📊 Creating Pool with config:");
+      // Use the connection string with sslmode parameter instead of ssl object
+      // This is more reliable for DigitalOcean
+      dbUrl = dbUrl + "?sslmode=no-verify";
+      console.log("📊 Added sslmode=no-verify to connection string");
+
+      poolConfig = {
+        connectionString: dbUrl,
+        // Don't add ssl object when using sslmode in connection string
+      };
+    } else {
+      console.log("🔐 Development mode - no SSL");
+      poolConfig = {
+        connectionString: dbUrl,
+      };
+    }
+
     console.log(
-      "  - connectionString length:",
-      poolConfig.connectionString.length
+      "📊 Final connection string includes sslmode:",
+      dbUrl.includes("sslmode")
     );
-    console.log("  - ssl:", JSON.stringify(poolConfig.ssl));
+    console.log("📊 Pool config has ssl object:", !!poolConfig.ssl);
 
     try {
       this.pool = new Pool(poolConfig);
       console.log("✅ Pool created successfully");
 
-      // Add error listener to pool
+      // Add error listener
       this.pool.on("error", (err) => {
-        console.error("🚨 Unexpected pool error:", err);
-      });
-
-      this.pool.on("connect", () => {
-        console.log("🔗 Pool client connected");
+        console.error("🚨 Pool error:", err.message);
       });
     } catch (error) {
       console.error("❌ Failed to create pool:", error);
@@ -99,49 +72,30 @@ export class Database {
   }
 
   async query(text: string, params?: any[]): Promise<any> {
-    console.log("🔍 Attempting query:", text.substring(0, 50) + "...");
-    console.log("🔍 Query params count:", params?.length || 0);
-
-    let client;
+    console.log("🔍 Query:", text.substring(0, 30) + "...");
+    const client = await this.pool.connect();
     try {
-      console.log("🔍 Getting client from pool...");
-      client = await this.pool.connect();
-      console.log("✅ Got client from pool");
-
-      console.log("🔍 Executing query...");
       const result = await client.query(text, params);
-      console.log("✅ Query executed successfully");
-      console.log("🔍 Result rows:", result.rows?.length || 0);
-
+      console.log("✅ Query successful");
       return result;
     } catch (error: any) {
-      console.error("❌ Query failed:", error.message);
-      console.error("❌ Error code:", error.code);
-      console.error("❌ Error stack:", error.stack);
+      console.error("❌ Query error:", error.message);
       throw error;
     } finally {
-      if (client) {
-        console.log("🔍 Releasing client back to pool");
-        client.release();
-      }
+      client.release();
     }
   }
 
   async initializeSchema(): Promise<void> {
-    console.log("📝 Initializing database schema...");
     const schemaPath = path.join(__dirname, "../../database/schema.sql");
-    console.log("📝 Schema path:", schemaPath);
-    console.log("📝 Schema file exists:", fs.existsSync(schemaPath));
-
     const schema = fs.readFileSync(schemaPath, "utf8");
-    console.log("📝 Schema length:", schema.length);
 
     const client = await this.pool.connect();
     try {
       await client.query(schema);
-      console.log("✅ Database schema initialized successfully");
+      console.log("Database schema initialized successfully");
     } catch (error) {
-      console.error("❌ Error initializing database schema:", error);
+      console.error("Error initializing database schema:", error);
       throw error;
     } finally {
       client.release();
@@ -149,9 +103,7 @@ export class Database {
   }
 
   async close(): Promise<void> {
-    console.log("🔒 Closing database pool...");
     await this.pool.end();
-    console.log("✅ Database pool closed");
   }
 
   // Person management methods
@@ -278,20 +230,14 @@ export class Database {
   async healthCheck(): Promise<boolean> {
     console.log("🏥 Starting database health check...");
     try {
-      console.log("🏥 Attempting SELECT 1 query...");
       await this.query("SELECT 1");
       console.log("✅ Database health check PASSED");
       return true;
     } catch (error: any) {
-      console.error("❌ Database health check FAILED");
-      console.error("❌ Health check error:", error.message);
-      console.error("❌ Health check error code:", error.code);
-      console.error("❌ Health check error stack:", error.stack);
+      console.error("❌ Database health check FAILED:", error.message);
       return false;
     }
   }
 }
 
-console.log("📦 Creating database instance...");
 export const db = new Database();
-console.log("📦 Database instance created");

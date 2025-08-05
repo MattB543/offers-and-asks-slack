@@ -1,6 +1,4 @@
 import { config } from "dotenv";
-import Bree from "bree";
-import path from "path";
 import { app } from "./app";
 import { db } from "./lib/database";
 import { embeddingService } from "./lib/openai";
@@ -41,7 +39,6 @@ const PORT = process.env.PORT || 3000;
 console.log("🔧 Server will use PORT:", PORT);
 
 class Server {
-  private bree: Bree | null = null;
 
   async start() {
     try {
@@ -66,11 +63,8 @@ class Server {
         `🏥 Health checks available through the bot's internal monitoring`
       );
 
-      // Start job scheduler
-      if (this.bree) {
-        this.bree.start();
-        console.log("📅 Job scheduler started");
-      }
+      // Job scheduler is disabled - manual mode only
+      console.log("📅 Job scheduler: DISABLED (manual weekly prompts via admin button)");
 
       // Notify admin that server started
       await errorHandler.notifyAdmin(
@@ -135,39 +129,12 @@ class Server {
 
   private initializeScheduler() {
     try {
-      console.log("📅 Initializing job scheduler...");
+      console.log("📅 Job scheduler disabled - weekly prompts are manual only");
+      console.log("💡 Use admin controls in app home to send weekly prompts");
       
-      // Temporarily disable Bree scheduler due to cron validation issue
-      // Weekly prompts can be triggered manually via admin controls in app home
-      console.log("⚠️  Automatic weekly scheduler disabled - use admin controls to send weekly prompts");
+      // No automatic scheduling - weekly prompts are triggered manually via admin button
       
-      // Commenting out Bree initialization to prevent startup errors
-      /*
-      const jobsPath = path.join(__dirname, "jobs");
-      console.log("📅 Jobs path:", jobsPath);
-
-      this.bree = new Bree({
-        root: jobsPath,
-        jobs: [
-          {
-            name: "weekly-prompt",
-            // Monday 9:00 AM Eastern Time
-            cron: "0 9 * * 1",
-            timezone: "America/New_York",
-          },
-        ],
-        errorHandler: async (error: any, workerMetadata: any) => {
-          console.error(`Job error in ${workerMetadata.name}:`, error);
-          await errorHandler.handle(
-            error,
-            `job_${workerMetadata.name}`,
-            workerMetadata
-          );
-        },
-      });
-      */
-
-      console.log("✅ Job scheduler initialized (manual mode)");
+      console.log("✅ Manual-only mode initialized");
     } catch (error) {
       console.error("❌ Job scheduler initialization failed:", error);
       throw error;
@@ -179,13 +146,6 @@ class Server {
     console.log("🛑 Stop timestamp:", new Date().toISOString());
 
     try {
-      // Stop job scheduler
-      if (this.bree) {
-        console.log("🛑 Stopping job scheduler...");
-        await this.bree.stop();
-        console.log("📅 Job scheduler stopped");
-      }
-
       // Stop Slack app
       console.log("🛑 Stopping Slack app...");
       await app.stop();

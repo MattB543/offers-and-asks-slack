@@ -32,20 +32,14 @@ export async function sendWeeklyPrompts(): Promise<{
       await Promise.all(
         batch.map(async (user) => {
           try {
-            // Open DM channel with user
-            const dmResponse = await slackClient.conversations.open({
-              users: user.slack_id,
-            });
-
-            if (!dmResponse.ok || !dmResponse.channel) {
-              throw new Error(`Failed to open DM: ${dmResponse.error}`);
-            }
-
-            // Send weekly prompt message
+            // Send weekly prompt message directly to user
             await slackClient.chat.postMessage({
-              channel: dmResponse.channel.id!,
+              channel: user.slack_id,
               text: "What do you need help with this week?",
               blocks: [
+                {
+                  type: "divider",
+                },
                 {
                   type: "header",
                   text: {

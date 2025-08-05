@@ -2,7 +2,7 @@ import { App } from "@slack/bolt";
 import { config } from "dotenv";
 import { db } from "./lib/database";
 import { embeddingService } from "./lib/openai";
-import { helperMatchingService } from "./services/matching";
+import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
 import { sendWeeklyPrompts } from "./jobs/weekly-prompt";
 
@@ -41,17 +41,31 @@ const formatHelperResults = (helpers: any[], needText: string) => {
 
   const helperText = helpers
     .slice(0, 5)
-    .map(
-      (helper) =>
-        `• <@${helper.id}> – ${helper.skills
-          .slice(0, 3)
-          .join(", ")} _(score: ${(helper.score * 100).toFixed(0)}%)_`
-    )
+    .map((helper) => {
+      // Format skills with bolding for high relevance and scores
+      const skillsText = helper.skills
+        .slice(0, 3)
+        .map((skillObj: HelperSkill) => {
+          const score = (skillObj.score * 100).toFixed(0);
+          // Bold skills with >70% relevance
+          if (skillObj.score > 0.7) {
+            return `*${skillObj.skill}* (${score}%)`;
+          } else {
+            return `${skillObj.skill} (${score}%)`;
+          }
+        })
+        .join(", ");
+      
+      return `• <@${helper.id}> – ${skillsText}`;
+    })
     .join("\n");
 
   return {
     text: `Found ${helpers.length} people who might help with: "${needText}"`,
     blocks: [
+      {
+        type: "divider",
+      },
       {
         type: "section",
         text: {
@@ -109,21 +123,27 @@ app.event("app_home_opened", async ({ event, client }) => {
         },
       },
       {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: " ",
+        },
+      },
+      {
         type: "divider",
       },
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*Your Skills*",
+          text: " ",
         },
-        accessory: {
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: "Manage Skills",
-          },
-          action_id: "manage_skills",
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*Your Skills*",
         },
       },
       {
@@ -139,22 +159,40 @@ app.event("app_home_opened", async ({ event, client }) => {
         ],
       },
       {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Manage Skills",
+            },
+            action_id: "manage_skills",
+          },
+        ],
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: " ",
+        },
+      },
+      {
         type: "divider",
       },
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*Need Help?*",
+          text: " ",
         },
-        accessory: {
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: "Find Helpers",
-          },
-          action_id: "find_helpers",
-          style: "primary",
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "*Need Help?*",
         },
       },
       {
@@ -163,6 +201,20 @@ app.event("app_home_opened", async ({ event, client }) => {
           {
             type: "mrkdwn",
             text: "💡 You can also DM me directly with what you need help with!",
+          },
+        ],
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Find Helpers",
+            },
+            action_id: "find_helpers",
+            style: "primary",
           },
         ],
       },
@@ -175,7 +227,21 @@ app.event("app_home_opened", async ({ event, client }) => {
 
       blocks.push(
         {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
+        },
+        {
           type: "divider",
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
         },
         {
           type: "section",
@@ -183,6 +249,19 @@ app.event("app_home_opened", async ({ event, client }) => {
             type: "mrkdwn",
             text: "*🔧 Admin Controls*",
           },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `📊 Quick Stats: ${stats.totalHelpers} helpers • ${
+                stats.totalNeeds
+              } needs this week • Top skill: ${
+                stats.topSkills[0]?.skill || "N/A"
+              }`,
+            },
+          ],
         },
         {
           type: "actions",
@@ -211,19 +290,6 @@ app.event("app_home_opened", async ({ event, client }) => {
                 text: "🧪 Test DM",
               },
               action_id: "admin_test_dm",
-            },
-          ],
-        },
-        {
-          type: "context",
-          elements: [
-            {
-              type: "mrkdwn",
-              text: `📊 Quick Stats: ${stats.totalHelpers} helpers • ${
-                stats.totalNeeds
-              } needs this week • Top skill: ${
-                stats.topSkills[0]?.skill || "N/A"
-              }`,
             },
           ],
         }
@@ -391,11 +457,13 @@ app.action("admin_test_dm", async ({ ack, body, client }) => {
   }
 
   try {
-    const dmChannel = await client.conversations.open({ users: userId });
     await client.chat.postMessage({
-      channel: dmChannel.channel?.id || "",
+      channel: userId,
       text: "🧪 Test DM from Offers and Asks bot!",
       blocks: [
+        {
+          type: "divider",
+        },
         {
           type: "section",
           text: {
@@ -407,14 +475,7 @@ app.action("admin_test_dm", async ({ ack, body, client }) => {
     });
   } catch (error: any) {
     console.error(`Admin test DM failed for ${userId}:`, error.message);
-    if (error.data?.error === 'missing_scope') {
-      await client.chat.postMessage({
-        channel: userId,
-        text: "❌ Test DM failed: The app is missing the 'conversations:open' scope. Please update the app permissions in Slack app settings."
-      });
-    } else {
-      await errorHandler.handle(error, "admin_test_dm", { userId });
-    }
+    await errorHandler.handle(error, "admin_test_dm", { userId });
   }
 });
 
@@ -722,20 +783,12 @@ app.view("need_help_modal", async ({ ack, body, view, client }) => {
     // Find helpers for this need
     const helpers = await helperMatchingService.findHelpers(needText, userId);
 
-    try {
-      // Create DM with user
-      const dmChannel = await client.conversations.open({ users: userId });
-
-      // Format and send results
-      const results = formatHelperResults(helpers, needText);
-      await client.chat.postMessage({
-        channel: dmChannel.channel?.id || "",
-        ...results,
-      });
-    } catch (dmError: any) {
-      console.error(`Could not send DM to ${userId}:`, dmError.message);
-      throw new Error(`Unable to send results via DM. Please check app permissions.`);
-    }
+    // Format and send results directly to user (using user ID as channel)
+    const results = formatHelperResults(helpers, needText);
+    await client.chat.postMessage({
+      channel: userId,
+      ...results,
+    });
   } catch (error) {
     await errorHandler.handle(error, "need_help_modal", {
       userId: body.user.id,
@@ -793,27 +846,207 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
       }
     }
 
-    // Send confirmation
-    if (addedSkills.length > 0 || removedSkills.length > 0) {
-      try {
-        const dmChannel = await client.conversations.open({ users: userId });
-        let message = "✅ Skills updated!\n";
-        if (addedSkills.length > 0) {
-          message += `\n*Added:* ${addedSkills.join(", ")}`;
-        }
-        if (removedSkills.length > 0) {
-          message += `\n*Removed:* ${removedSkills.join(", ")}`;
-        }
+    // Skills updated - home page refresh will show the changes, no need for DM confirmation
 
-        await client.chat.postMessage({
-          channel: dmChannel.channel?.id || "",
-          text: message,
-        });
-      } catch (dmError: any) {
-        // If we can't send a DM (missing scope or other issue), log it but don't fail the whole operation
-        console.warn(`Could not send DM confirmation to ${userId}:`, dmError.message);
-        // Skills were still updated successfully, just couldn't send confirmation
+    // Refresh the app home to show updated skills
+    try {
+      // Get updated user skills
+      const updatedUserSkills = await db.getPersonSkills(userId);
+      
+      // Build blocks for the home view (same logic as app_home_opened)
+      const blocks: any[] = [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Welcome to Offers and Asks! 🤝*\n\nConnect with teammates who have the skills you need, or help others with your expertise.",
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
+        },
+        {
+          type: "divider",
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Your Skills*",
+          },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text:
+                updatedUserSkills.length > 0
+                  ? `Skills: ${updatedUserSkills.map((s) => s.skill).join(", ")}`
+                  : 'No skills added yet. Click "Manage Skills" to add some!',
+            },
+          ],
+        },
+        {
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Manage Skills",
+              },
+              action_id: "manage_skills",
+            },
+          ],
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
+        },
+        {
+          type: "divider",
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: " ",
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Need Help?*",
+          },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "💡 You can also DM me directly with what you need help with!",
+            },
+          ],
+        },
+        {
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "Find Helpers",
+              },
+              action_id: "find_helpers",
+              style: "primary",
+            },
+          ],
+        },
+      ];
+
+      // Add admin section if user is admin
+      if (isAdmin(userId)) {
+        const stats = await helperMatchingService.getWeeklyStats();
+        blocks.push(
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: " ",
+            },
+          },
+          {
+            type: "divider",
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: " ",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "*🔧 Admin Controls*",
+            },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `📊 Quick Stats: ${stats.totalHelpers} helpers • ${
+                  stats.totalNeeds
+                } needs this week • Top skill: ${
+                  stats.topSkills[0]?.skill || "N/A"
+                }`,
+              },
+            ],
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "📨 Send Weekly Prompts",
+                },
+                action_id: "admin_send_weekly",
+                style: "primary",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "📊 View Stats",
+                },
+                action_id: "admin_view_stats",
+              },
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "🧪 Test DM",
+                },
+                action_id: "admin_test_dm",
+              },
+            ],
+          }
+        );
       }
+
+      // Refresh the home view
+      await client.views.publish({
+        user_id: userId,
+        view: {
+          type: "home",
+          blocks,
+        },
+      });
+
+      console.log(`📱 Home view refreshed for user ${userId} after skills update`);
+    } catch (homeRefreshError: any) {
+      console.warn(`Could not refresh home view for ${userId}:`, homeRefreshError.message);
+      // Don't fail the whole operation if home refresh fails
     }
   } catch (error) {
     await errorHandler.handle(error, "manage_skills_modal", {

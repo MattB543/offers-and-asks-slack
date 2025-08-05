@@ -1,10 +1,15 @@
 import { db } from '../lib/database';
 import { embeddingService } from '../lib/openai';
 
+export interface HelperSkill {
+  skill: string;
+  score: number;
+}
+
 export interface Helper {
   id: string;
   name: string;
-  skills: string[];
+  skills: HelperSkill[];
   score?: number;
 }
 
@@ -43,19 +48,28 @@ export class HelperMatchingService {
           helperMap.set(row.slack_id, helper);
         }
         
-        // Add skill if not already present and we have room
-        if (helper.skills.length < 3 && !helper.skills.includes(row.skill)) {
-          helper.skills.push(row.skill);
+        // Add skill with score if not already present and we have room
+        const existingSkill = helper.skills.find(s => s.skill === row.skill);
+        if (!existingSkill && helper.skills.length < 3) {
+          helper.skills.push({
+            skill: row.skill,
+            score: row.score
+          });
         }
         
-        // Update score to be the max score across all their skills
+        // Update overall score to be the max score across all their skills
         if (row.score > (helper.score || 0)) {
           helper.score = row.score;
         }
       }
       
-      // Convert to array and sort by score
+      // Convert to array, sort skills within each helper, then sort helpers by score
       const helpers = Array.from(helperMap.values())
+        .map(helper => ({
+          ...helper,
+          // Sort skills by relevance score (highest first)
+          skills: helper.skills.sort((a, b) => b.score - a.score)
+        }))
         .sort((a, b) => (b.score || 0) - (a.score || 0))
         .slice(0, limit)
         .filter(helper => helper.skills.length > 0); // Only include helpers with relevant skills

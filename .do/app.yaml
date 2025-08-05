@@ -6,6 +6,7 @@ services:
     repo: your-username/offers-and-asks-slack
     branch: main
     deploy_on_push: true
+  build_command: npm run build
   run_command: npm start
   environment_slug: node-js
   instance_count: 1

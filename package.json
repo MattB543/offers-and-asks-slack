@@ -5,7 +5,6 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "prestart": "npm run build",
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
     "setup-db": "ts-node src/scripts/setup-database.ts",

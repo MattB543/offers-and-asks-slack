@@ -15,6 +15,11 @@ yarn-error.log*
 dist/
 build/
 
+# Prevent compiled files in source directory
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+
 # Runtime data
 pids
 *.pid

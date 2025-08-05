@@ -39,9 +39,15 @@ export class EmbeddingService {
 
   async healthCheck(): Promise<boolean> {
     try {
-      // Test with a simple embedding request
-      await this.generateEmbedding('test');
-      return true;
+      // In production, just check if we have an API key
+      // In development, make an actual API call
+      if (process.env.NODE_ENV === 'production') {
+        return !!process.env.OPENAI_API_KEY;
+      } else {
+        // Test with a simple embedding request in development
+        await this.generateEmbedding('test');
+        return true;
+      }
     } catch (error) {
       console.error('OpenAI health check failed:', error);
       return false;

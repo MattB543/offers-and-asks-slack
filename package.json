@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
+    "prestart": "npm run build",
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
     "setup-db": "ts-node src/scripts/setup-database.ts",
@@ -17,9 +18,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^24.2.0",
-    "@types/pg": "^8.15.5",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "@types/pg": "^8.15.5"
   },
   "dependencies": {
     "@slack/bolt": "^4.4.0",
@@ -27,6 +26,8 @@
     "dotenv": "^17.2.1",
     "fast-csv": "^5.0.5",
     "openai": "^5.11.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
   }
 }

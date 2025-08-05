@@ -7,6 +7,48 @@ import { errorHandler } from './utils/errorHandler';
 
 config();
 
+// Helper function to open the need help modal
+const openNeedHelpModal = async (client: any, triggerId: string) => {
+  await client.views.open({
+    trigger_id: triggerId,
+    view: {
+      type: 'modal',
+      callback_id: 'need_help_modal',
+      title: {
+        type: 'plain_text',
+        text: 'What do you need help with?'
+      },
+      submit: {
+        type: 'plain_text',
+        text: 'Find Helpers'
+      },
+      close: {
+        type: 'plain_text',
+        text: 'Cancel'
+      },
+      blocks: [
+        {
+          type: 'input',
+          block_id: 'need_input',
+          element: {
+            type: 'plain_text_input',
+            action_id: 'need_text',
+            multiline: true,
+            placeholder: {
+              type: 'plain_text',
+              text: 'Describe what you need help with... (e.g., "Setting up React testing with Jest", "Optimizing PostgreSQL queries", etc.)'
+            }
+          },
+          label: {
+            type: 'plain_text',
+            text: 'Your need'
+          }
+        }
+      ]
+    }
+  });
+};
+
 export const app = new App({
   signingSecret: process.env.SLACK_SIGNING_SECRET!,
   token: process.env.SLACK_BOT_TOKEN!,
@@ -111,44 +153,7 @@ app.action('open_need_modal', async ({ ack, body, client }) => {
   await ack();
   
   try {
-    await client.views.open({
-      trigger_id: (body as any).trigger_id,
-      view: {
-        type: 'modal',
-        callback_id: 'need_help_modal',
-        title: {
-          type: 'plain_text',
-          text: 'What do you need help with?'
-        },
-        submit: {
-          type: 'plain_text',
-          text: 'Find Helpers'
-        },
-        close: {
-          type: 'plain_text',
-          text: 'Cancel'
-        },
-        blocks: [
-          {
-            type: 'input',
-            block_id: 'need_input',
-            element: {
-              type: 'plain_text_input',
-              action_id: 'need_text',
-              multiline: true,
-              placeholder: {
-                type: 'plain_text',
-                text: 'Describe what you need help with... (e.g., "Setting up React testing with Jest", "Optimizing PostgreSQL queries", etc.)'
-              }
-            },
-            label: {
-              type: 'plain_text',
-              text: 'Your need'
-            }
-          }
-        ]
-      }
-    });
+    await openNeedHelpModal(client, (body as any).trigger_id);
   } catch (error) {
     await errorHandler.handle(error, 'open_need_modal', { userId: (body as any).user.id });
   }
@@ -159,44 +164,7 @@ app.action('find_helpers', async ({ ack, body, client }) => {
   await ack();
   
   try {
-    await client.views.open({
-      trigger_id: (body as any).trigger_id,
-      view: {
-        type: 'modal',
-        callback_id: 'need_help_modal',
-        title: {
-          type: 'plain_text',
-          text: 'What do you need help with?'
-        },
-        submit: {
-          type: 'plain_text',
-          text: 'Find Helpers'
-        },
-        close: {
-          type: 'plain_text',
-          text: 'Cancel'
-        },
-        blocks: [
-          {
-            type: 'input',
-            block_id: 'need_input',
-            element: {
-              type: 'plain_text_input',
-              action_id: 'need_text',
-              multiline: true,
-              placeholder: {
-                type: 'plain_text',
-                text: 'Describe what you need help with... (e.g., "Setting up React testing with Jest", "Optimizing PostgreSQL queries", etc.)'
-              }
-            },
-            label: {
-              type: 'plain_text',
-              text: 'Your need'
-            }
-          }
-        ]
-      }
-    });
+    await openNeedHelpModal(client, (body as any).trigger_id);
   } catch (error) {
     await errorHandler.handle(error, 'find_helpers', { userId: (body as any).user.id });
   }

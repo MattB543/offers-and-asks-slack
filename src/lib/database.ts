@@ -6,19 +6,17 @@ export class Database {
   private pool: Pool;
 
   constructor() {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set.');
+    }
+
     this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL || undefined,
-      host: process.env.DB_HOST || "localhost",
-      port: parseInt(process.env.DB_PORT || "5432"),
-      database: process.env.DB_NAME || "helper_matcher",
-      user: process.env.DB_USER || "postgres",
-      password: process.env.DB_PASSWORD,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-      ssl: {
-        rejectUnauthorized: false,
-      },
+      connectionString: process.env.DATABASE_URL,
+      // Production environments like DigitalOcean and Heroku often require SSL
+      // The connection string usually handles this, but you can be explicit if needed.
+      ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false } // A common setting for managed DBs, but check your provider's docs
+        : false,
     });
   }
 

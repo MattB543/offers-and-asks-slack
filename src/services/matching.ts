@@ -112,12 +112,13 @@ export class HelperMatchingService {
       );
       
       // Get average match scores for this week's suggestions
-      const avgScoreResult = await db.query(`
-        SELECT AVG(similarity_score) as avg_score 
-        FROM helper_suggestions hs 
-        JOIN weekly_needs wn ON hs.need_id = wn.id 
-        WHERE wn.week_start = $1
-      `, [weekStart]);
+      // Note: helper_suggestions table functionality not yet implemented
+      // const avgScoreResult = await db.query(`
+      //   SELECT AVG(similarity_score) as avg_score 
+      //   FROM helper_suggestions hs 
+      //   JOIN weekly_needs wn ON hs.need_id = wn.id 
+      //   WHERE wn.week_start = $1
+      // `, [weekStart]);
       
       // Get top skills by usage
       const topSkillsResult = await db.query(`
@@ -134,7 +135,7 @@ export class HelperMatchingService {
       return {
         totalNeeds: parseInt(needsResult.rows[0].count),
         totalHelpers: parseInt(helpersResult.rows[0].count),
-        averageMatchScore: parseFloat(avgScoreResult.rows[0].avg_score || '0'),
+        averageMatchScore: 0, // Set to 0 since helper_suggestions functionality not yet implemented
         topSkills: topSkillsResult.rows
       };
     } catch (error) {

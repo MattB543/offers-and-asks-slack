@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { App } from '@slack/bolt';
+import { WebClient } from '@slack/web-api';
 import { db } from '../lib/database';
 import { errorHandler } from '../utils/errorHandler';
 
@@ -8,11 +8,8 @@ config();
 async function sendWeeklyPrompts() {
   console.log('Starting weekly prompt job...');
   
-  // Create Slack app instance
-  const slackApp = new App({
-    signingSecret: process.env.SLACK_SIGNING_SECRET!,
-    token: process.env.SLACK_BOT_TOKEN!,
-  });
+  // Create a simple WebClient instance
+  const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN!);
   
   try {
     // Get all enabled users
@@ -25,7 +22,7 @@ async function sendWeeklyPrompts() {
     for (const user of enabledUsers) {
       try {
         // Open DM channel with user
-        const dmResponse = await slackApp.client.conversations.open({
+        const dmResponse = await slackClient.conversations.open({
           users: user.slack_id
         });
         
@@ -34,7 +31,7 @@ async function sendWeeklyPrompts() {
         }
         
         // Send weekly prompt message
-        await slackApp.client.chat.postMessage({
+        await slackClient.chat.postMessage({
           channel: dmResponse.channel?.id || '',
           text: 'What do you need help with this week?',
           blocks: [

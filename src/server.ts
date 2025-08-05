@@ -17,9 +17,6 @@ class Server {
     try {
       console.log('🚀 Starting Helper Matcher server...');
 
-      // Initialize database schema
-      await this.initializeDatabase();
-
       // Health check services
       await this.performHealthChecks();
 
@@ -50,17 +47,6 @@ class Server {
       console.error('❌ Server startup failed:', error);
       await errorHandler.handle(error, 'server_startup');
       process.exit(1);
-    }
-  }
-
-  private async initializeDatabase() {
-    try {
-      console.log('🗄️  Initializing database...');
-      await db.initializeSchema();
-      console.log('✅ Database initialized');
-    } catch (error) {
-      console.error('❌ Database initialization failed:', error);
-      throw error;
     }
   }
 

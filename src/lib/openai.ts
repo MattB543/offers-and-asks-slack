@@ -38,20 +38,12 @@ export class EmbeddingService {
   }
 
   async healthCheck(): Promise<boolean> {
-    try {
-      // In production, just check if we have an API key
-      // In development, make an actual API call
-      if (process.env.NODE_ENV === 'production') {
-        return !!process.env.OPENAI_API_KEY;
-      } else {
-        // Test with a simple embedding request in development
-        await this.generateEmbedding('test');
-        return true;
-      }
-    } catch (error) {
-      console.error('OpenAI health check failed:', error);
-      return false;
+    // A simple, no-cost check is to see if the API key is configured.
+    const isConfigured = !!this.openai.apiKey;
+    if (!isConfigured) {
+        console.error('OpenAI health check failed: API key is missing.');
     }
+    return isConfigured;
   }
 }
 

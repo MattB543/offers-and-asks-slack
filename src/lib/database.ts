@@ -6,13 +6,15 @@ export class Database {
   private pool: Pool;
 
   constructor() {
-    if (!process.env.DATABASE_URL) {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
       throw new Error("DATABASE_URL environment variable is not set.");
     }
 
+    const connectionString = `${dbUrl}?sslmode=no-verify`;
+
     this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      connectionString: connectionString,
     });
   }
 

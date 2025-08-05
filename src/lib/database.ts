@@ -11,11 +11,18 @@ export class Database {
       throw new Error("DATABASE_URL environment variable is not set.");
     }
 
+    // Path to the CA certificate file in your project
+    const caCertPath = path.join(__dirname, '../../ca-certificate.crt');
+
+    const sslConfig = {
+      rejectUnauthorized: true, // Enforce SSL verification
+      ca: fs.readFileSync(caCertPath).toString(),
+    };
+
     this.pool = new Pool({
       connectionString: dbUrl,
-      ssl: {
-        rejectUnauthorized: false,
-      },
+      // Use the new SSL config only in production
+      ssl: process.env.NODE_ENV === 'production' ? sslConfig : { rejectUnauthorized: false },
     });
   }
 

@@ -13,8 +13,6 @@ services:
     instance_size_slug: basic-xxs
     http_port: 3000
     envs:
-      - key: NODE_TLS_REJECT_UNAUTHORIZED
-        value: "0"
       - key: NODE_ENV
         value: production
       - key: SLACK_BOT_TOKEN
@@ -24,12 +22,12 @@ services:
       - key: OPENAI_API_KEY
         type: SECRET
       - key: DATABASE_URL
-        type: SECRET
+        value: ${offers-and-asks-slack-db.DATABASE_URL}
       - key: ADMIN_USER_ID
         type: SECRET
 
 databases:
-  - name: helper-matcher-db
+  - name: offers-and-asks-slack-db
     engine: PG
-    version: "15"
+    version: "17"
     size: db-s-1vcpu-1gb

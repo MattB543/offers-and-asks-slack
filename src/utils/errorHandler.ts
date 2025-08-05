@@ -1,95 +1,118 @@
-import { App } from '@slack/bolt';
+import { App } from "@slack/bolt";
 
 export class ErrorHandler {
-  private slackApp: App | null = null;
+  public slackApp: App | null = null;
 
   setSlackApp(app: App) {
     this.slackApp = app;
   }
 
   async handle(error: any, context: string, metadata?: any): Promise<void> {
-    console.error(`Error in ${context}:`, error);
-    console.error('Metadata:', metadata);
+    // Always log to console
+    console.error(`[${context}] Error:`, error);
+    if (metadata) {
+      console.error(`[${context}] Metadata:`, metadata);
+    }
 
-    // Don't send admin notifications in development
-    if (process.env.NODE_ENV === 'development') {
+    // Skip Slack notifications in development
+    if (process.env.NODE_ENV === "development") {
       return;
     }
 
-    if (!this.slackApp) {
-      console.warn('Slack app not set, skipping admin notification');
+    // Send admin notification if possible
+    await this.notifyAdminError(error, context, metadata);
+  }
+
+  private async notifyAdminError(
+    error: any,
+    context: string,
+    metadata?: any
+  ): Promise<void> {
+    if (!this.slackApp || !process.env.ADMIN_USER_ID) {
       return;
     }
 
     try {
-      const adminUserId = process.env.ADMIN_USER_ID;
-      if (!adminUserId) {
-        console.warn('ADMIN_USER_ID not set, skipping admin notification');
-        return;
+      const adminIds = process.env.ADMIN_USER_ID.split(",").map((id) =>
+        id.trim()
+      );
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack =
+        error instanceof Error && error.stack
+          ? error.stack.substring(0, 500)
+          : "No stack trace";
+
+      // Send to each admin
+      for (const adminId of adminIds) {
+        await this.slackApp.client.chat.postMessage({
+          channel: adminId,
+          text: `🚨 Error in ${context}`,
+          blocks: [
+            {
+              type: "header",
+              text: {
+                type: "plain_text",
+                text: "🚨 System Error",
+                emoji: true,
+              },
+            },
+            {
+              type: "section",
+              fields: [
+                {
+                  type: "mrkdwn",
+                  text: `*Context:*\n${context}`,
+                },
+                {
+                  type: "mrkdwn",
+                  text: `*Time:*\n${new Date().toISOString()}`,
+                },
+              ],
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*Error:*\n\`\`\`${errorMessage}\`\`\``,
+              },
+            },
+          ],
+        });
       }
-
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-
-      await this.slackApp.client.chat.postMessage({
-        channel: adminUserId,
-        text: `🚨 Helper-bot error in \`${context}\``,
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `🚨 *Helper-bot error in \`${context}\`*`
-            }
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*Error:* ${errorMessage}`
-            }
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*Context:* ${JSON.stringify(metadata, null, 2)}`
-            }
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `*Stack:*\n\`\`\`${errorStack?.substring(0, 500) || 'No stack trace'}\`\`\``
-            }
-          }
-        ]
-      });
     } catch (notificationError) {
-      console.error('Failed to send admin notification:', notificationError);
+      console.error("Failed to send admin notification:", notificationError);
     }
   }
 
   async notifyAdmin(message: string, blocks?: any[]): Promise<void> {
-    if (!this.slackApp) {
-      console.warn('Slack app not set, skipping admin notification');
+    if (!this.slackApp || !process.env.ADMIN_USER_ID) {
+      console.log(`[Admin Notification] ${message}`);
       return;
     }
 
     try {
-      const adminUserId = process.env.ADMIN_USER_ID;
-      if (!adminUserId) {
-        console.warn('ADMIN_USER_ID not set, skipping admin notification');
-        return;
-      }
+      const adminIds = process.env.ADMIN_USER_ID.split(",").map((id) =>
+        id.trim()
+      );
 
-      await this.slackApp.client.chat.postMessage({
-        channel: adminUserId,
-        text: message,
-        blocks: blocks
-      });
+      for (const adminId of adminIds) {
+        await this.slackApp.client.chat.postMessage({
+          channel: adminId,
+          text: message,
+          blocks: blocks || [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: message,
+              },
+            },
+          ],
+        });
+      }
     } catch (error) {
-      console.error('Failed to send admin notification:', error);
+      console.error("Failed to send admin notification:", error);
     }
   }
 }

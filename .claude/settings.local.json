@@ -12,7 +12,8 @@
       "Bash(find:*)",
       "Bash(timeout:*)",
       "Bash(echo \"Exit code: $?\")",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm run setup-db:*)"
     ],
     "deny": []
   }

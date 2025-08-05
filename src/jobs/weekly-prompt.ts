@@ -1,118 +1,165 @@
-import { config } from 'dotenv';
-import { WebClient } from '@slack/web-api';
-import { db } from '../lib/database';
-import { errorHandler } from '../utils/errorHandler';
+import { config } from "dotenv";
+import { WebClient } from "@slack/web-api";
+import { db } from "../lib/database";
+import { errorHandler } from "../utils/errorHandler";
 
 config();
 
-async function sendWeeklyPrompts() {
-  console.log('Starting weekly prompt job...');
-  
+export async function sendWeeklyPrompts(): Promise<{
+  successCount: number;
+  errorCount: number;
+}> {
+  console.log("Starting weekly prompt job...");
+
   // Create a simple WebClient instance
   const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN!);
-  
+
+  let successCount = 0;
+  let errorCount = 0;
+  const errors: Array<{ user: string; error: string }> = [];
+
   try {
     // Get all enabled users
     const enabledUsers = await db.getAllEnabledPeople();
     console.log(`Found ${enabledUsers.length} enabled users`);
-    
-    let successCount = 0;
-    let errorCount = 0;
-    
-    for (const user of enabledUsers) {
-      try {
-        // Open DM channel with user
-        const dmResponse = await slackClient.conversations.open({
-          users: user.slack_id
-        });
-        
-        if (!dmResponse.ok || !dmResponse.channel) {
-          throw new Error(`Failed to open DM with ${user.slack_id}: ${dmResponse.error}`);
-        }
-        
-        // Send weekly prompt message
-        await slackClient.chat.postMessage({
-          channel: dmResponse.channel?.id || '',
-          text: 'What do you need help with this week?',
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: '*What do you need help with this week?* 🤝'
-              }
-            },
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: 'Click the button below to tell me what you need help with, and I\'ll find teammates with the right skills to assist you.'
-              }
-            },
-            {
-              type: 'actions',
-              elements: [
-                {
-                  type: 'button',
-                  text: {
-                    type: 'plain_text',
-                    text: '💡 Tell me what you need',
-                    emoji: true
-                  },
-                  action_id: 'open_need_modal',
-                  style: 'primary'
-                }
-              ]
-            },
-            {
-              type: 'context',
-              elements: [
-                {
-                  type: 'mrkdwn',
-                  text: 'You can also manage your skills or find helpers anytime by visiting our app home.'
-                }
-              ]
+
+    // Process users in batches to avoid rate limiting
+    const batchSize = 10;
+    for (let i = 0; i < enabledUsers.length; i += batchSize) {
+      const batch = enabledUsers.slice(i, i + batchSize);
+
+      // Process batch in parallel
+      await Promise.all(
+        batch.map(async (user) => {
+          try {
+            // Open DM channel with user
+            const dmResponse = await slackClient.conversations.open({
+              users: user.slack_id,
+            });
+
+            if (!dmResponse.ok || !dmResponse.channel) {
+              throw new Error(`Failed to open DM: ${dmResponse.error}`);
             }
-          ]
-        });
-        
-        successCount++;
-        console.log(`✅ Sent weekly prompt to ${user.display_name} (${user.slack_id})`);
-        
-        // Add small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-      } catch (userError) {
-        errorCount++;
-        console.error(`❌ Failed to send prompt to ${user.display_name} (${user.slack_id}):`, userError);
-        
-        // Continue with other users, but log the error
-        await errorHandler.handle(userError, 'weekly_prompt_individual', {
-          userId: user.slack_id,
-          userName: user.display_name
-        });
+
+            // Send weekly prompt message
+            await slackClient.chat.postMessage({
+              channel: dmResponse.channel.id!,
+              text: "What do you need help with this week?",
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "🤝 Weekly Check-in",
+                    emoji: true,
+                  },
+                },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: `Hey ${user.display_name}! What do you need help with this week?`,
+                  },
+                },
+                {
+                  type: "context",
+                  elements: [
+                    {
+                      type: "mrkdwn",
+                      text: "💬 You can simply reply to this message with what you need!",
+                    },
+                  ],
+                },
+              ],
+            });
+
+            successCount++;
+            console.log(`✅ Sent to ${user.display_name} (${user.slack_id})`);
+          } catch (userError: any) {
+            errorCount++;
+            const errorMsg = userError.message || String(userError);
+            errors.push({
+              user: user.display_name || user.slack_id,
+              error: errorMsg,
+            });
+            console.error(`❌ Failed for ${user.display_name}:`, errorMsg);
+          }
+        })
+      );
+
+      // Delay between batches
+      if (i + batchSize < enabledUsers.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
-    
-    console.log(`Weekly prompt job completed: ${successCount} success, ${errorCount} errors`);
-    
-    // Send summary to admin
-    await errorHandler.notifyAdmin(
-      `📊 Weekly prompt job completed`,
-      [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `📊 *Weekly Prompt Job Summary*\n• ✅ Success: ${successCount}\n• ❌ Errors: ${errorCount}\n• 👥 Total users: ${enabledUsers.length}`
-          }
-        }
-      ]
+
+    console.log(
+      `Weekly prompt job completed: ${successCount} success, ${errorCount} errors`
     );
-    
+
+    // Send detailed summary to admin
+    const adminUserId = process.env.ADMIN_USER_ID;
+    if (adminUserId && errorHandler.slackApp) {
+      const blocks: any[] = [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "📊 Weekly Prompt Summary",
+            emoji: true,
+          },
+        },
+        {
+          type: "section",
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `*✅ Success:*\n${successCount}`,
+            },
+            {
+              type: "mrkdwn",
+              text: `*❌ Errors:*\n${errorCount}`,
+            },
+            {
+              type: "mrkdwn",
+              text: `*👥 Total:*\n${enabledUsers.length}`,
+            },
+            {
+              type: "mrkdwn",
+              text: `*📅 Date:*\n${new Date().toLocaleDateString()}`,
+            },
+          ],
+        },
+      ];
+
+      // Add error details if any
+      if (errors.length > 0) {
+        blocks.push(
+          {
+            type: "divider",
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text:
+                "*Error Details:*\n" +
+                errors
+                  .slice(0, 5)
+                  .map((e) => `• ${e.user}: ${e.error}`)
+                  .join("\n"),
+            },
+          }
+        );
+      }
+
+      await errorHandler.notifyAdmin("Weekly prompt job completed", blocks);
+    }
+
+    return { successCount, errorCount };
   } catch (error) {
-    console.error('Weekly prompt job failed:', error);
-    await errorHandler.handle(error, 'weekly_prompt_job');
+    console.error("Weekly prompt job failed:", error);
+    await errorHandler.handle(error, "weekly_prompt_job");
     throw error;
   }
 }
@@ -120,14 +167,12 @@ async function sendWeeklyPrompts() {
 // Execute if called directly
 if (require.main === module) {
   sendWeeklyPrompts()
-    .then(() => {
-      console.log('Weekly prompt job finished successfully');
+    .then((result) => {
+      console.log("Weekly prompt job finished:", result);
       process.exit(0);
     })
     .catch((error) => {
-      console.error('Weekly prompt job failed:', error);
+      console.error("Weekly prompt job failed:", error);
       process.exit(1);
     });
 }
-
-export { sendWeeklyPrompts };

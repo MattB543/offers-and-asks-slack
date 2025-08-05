@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
-import { db } from '../lib/database';
-
 config();
+
+import { db } from '../lib/database';
 
 async function setupDatabase() {
   console.log('🛠️  Setting up database...');

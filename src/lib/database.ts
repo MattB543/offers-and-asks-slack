@@ -72,15 +72,9 @@ export class Database {
   }
 
   async query(text: string, params?: any[]): Promise<any> {
-    console.log("🔍 Query:", text.substring(0, 30) + "...");
     const client = await this.pool.connect();
     try {
-      const result = await client.query(text, params);
-      console.log("✅ Query successful");
-      return result;
-    } catch (error: any) {
-      console.error("❌ Query error:", error.message);
-      throw error;
+      return await client.query(text, params);
     } finally {
       client.release();
     }
@@ -94,9 +88,6 @@ export class Database {
     try {
       await client.query(schema);
       console.log("Database schema initialized successfully");
-    } catch (error) {
-      console.error("Error initializing database schema:", error);
-      throw error;
     } finally {
       client.release();
     }
@@ -162,6 +153,11 @@ export class Database {
     return result.rows[0];
   }
 
+  async getAllSkills(): Promise<any[]> {
+    const result = await this.query("SELECT * FROM skills ORDER BY skill");
+    return result.rows;
+  }
+
   // Person-skill relationship methods
   async addPersonSkill(slackId: string, skillId: number): Promise<void> {
     await this.query(
@@ -179,12 +175,11 @@ export class Database {
 
   async getPersonSkills(slackId: string): Promise<any[]> {
     const result = await this.query(
-      `
-      SELECT s.id, s.skill 
-      FROM skills s 
-      JOIN person_skills ps ON s.id = ps.skill_id 
-      WHERE ps.slack_id = $1
-    `,
+      `SELECT s.id, s.skill 
+       FROM skills s 
+       JOIN person_skills ps ON s.id = ps.skill_id 
+       WHERE ps.slack_id = $1
+       ORDER BY s.skill`,
       [slackId]
     );
     return result.rows;
@@ -204,23 +199,34 @@ export class Database {
     return result.rows[0].id;
   }
 
-  // Helper matching method using cosine similarity
+  async getWeeklyNeeds(weekStart: string): Promise<any[]> {
+    const result = await this.query(
+      `SELECT wn.*, p.display_name 
+       FROM weekly_needs wn
+       JOIN people p ON wn.slack_id = p.slack_id
+       WHERE wn.week_start = $1
+       ORDER BY wn.created_at DESC`,
+      [weekStart]
+    );
+    return result.rows;
+  }
+
+  // Helper matching using vector similarity
   async findSimilarHelpers(
     needEmbedding: number[],
     limit: number = 20
   ): Promise<any[]> {
     const result = await this.query(
-      `
-      SELECT p.slack_id, p.display_name,
-             s.skill,
-             1 - (s.embedding <=> $1::vector) AS score
-      FROM skills s
-      JOIN person_skills ps ON s.id = ps.skill_id
-      JOIN people p ON ps.slack_id = p.slack_id
-      WHERE p.enabled = TRUE
-      ORDER BY score DESC
-      LIMIT $2
-    `,
+      `SELECT p.slack_id, p.display_name,
+              s.skill,
+              1 - (s.embedding <=> $1::vector) AS score
+       FROM skills s
+       JOIN person_skills ps ON s.id = ps.skill_id
+       JOIN people p ON ps.slack_id = p.slack_id
+       WHERE p.enabled = TRUE 
+         AND s.embedding IS NOT NULL
+       ORDER BY score DESC
+       LIMIT $2`,
       [`[${needEmbedding.join(",")}]`, limit]
     );
     return result.rows;
@@ -228,13 +234,11 @@ export class Database {
 
   // Health check
   async healthCheck(): Promise<boolean> {
-    console.log("🏥 Starting database health check...");
     try {
       await this.query("SELECT 1");
-      console.log("✅ Database health check PASSED");
       return true;
-    } catch (error: any) {
-      console.error("❌ Database health check FAILED:", error.message);
+    } catch (error) {
+      console.error("Database health check failed:", error);
       return false;
     }
   }

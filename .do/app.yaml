@@ -1,33 +1,35 @@
 name: helper-matcher-slack
 services:
-- name: web
-  source_dir: /
-  github:
-    repo: your-username/offers-and-asks-slack
-    branch: main
-    deploy_on_push: true
-  build_command: npm run build
-  run_command: npm start
-  environment_slug: node-js
-  instance_count: 1
-  instance_size_slug: basic-xxs
-  http_port: 3000
-  envs:
-  - key: NODE_ENV
-    value: production
-  - key: SLACK_BOT_TOKEN
-    type: SECRET
-  - key: SLACK_SIGNING_SECRET
-    type: SECRET
-  - key: OPENAI_API_KEY
-    type: SECRET
-  - key: DATABASE_URL
-    type: SECRET
-  - key: ADMIN_USER_ID
-    type: SECRET
+  - name: web
+    source_dir: /
+    github:
+      repo: your-username/offers-and-asks-slack
+      branch: main
+      deploy_on_push: true
+    build_command: npm run build
+    run_command: npm start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 3000
+    envs:
+      - key: NODE_TLS_REJECT_UNAUTHORIZED
+        value: "0"
+      - key: NODE_ENV
+        value: production
+      - key: SLACK_BOT_TOKEN
+        type: SECRET
+      - key: SLACK_SIGNING_SECRET
+        type: SECRET
+      - key: OPENAI_API_KEY
+        type: SECRET
+      - key: DATABASE_URL
+        type: SECRET
+      - key: ADMIN_USER_ID
+        type: SECRET
 
 databases:
-- name: helper-matcher-db
-  engine: PG
-  version: "15"
-  size: db-s-1vcpu-1gb
+  - name: helper-matcher-db
+    engine: PG
+    version: "15"
+    size: db-s-1vcpu-1gb

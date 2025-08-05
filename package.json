@@ -5,9 +5,11 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
+    "postbuild": "npm run setup-db-safe",
     "start": "node dist/server.js",
     "dev": "ts-node src/server.ts",
     "setup-db": "ts-node src/scripts/setup-database.ts",
+    "setup-db-safe": "node dist/scripts/setup-database.js || echo 'Database setup failed - continuing anyway'",
     "seed-skills": "ts-node src/scripts/seed-skills.ts",
     "weekly-prompt": "ts-node src/jobs/weekly-prompt.ts",
     "test": "echo \"Error: no test specified\" && exit 1"

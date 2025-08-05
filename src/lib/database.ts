@@ -99,10 +99,25 @@ export class Database {
 
   // Person management methods
   async createPerson(slackId: string, displayName: string): Promise<void> {
-    await this.query(
-      "INSERT INTO people (slack_id, display_name) VALUES ($1, $2) ON CONFLICT (slack_id) DO UPDATE SET display_name = $2, updated_at = CURRENT_TIMESTAMP",
-      [slackId, displayName]
-    );
+    try {
+      await this.query(
+        "INSERT INTO people (slack_id, display_name) VALUES ($1, $2) ON CONFLICT (slack_id) DO UPDATE SET display_name = $2, updated_at = CURRENT_TIMESTAMP",
+        [slackId, displayName]
+      );
+    } catch (error: any) {
+      // If the table doesn't exist, try to initialize the schema
+      if (error.message?.includes('relation "people" does not exist')) {
+        console.log("⚠️ People table doesn't exist, initializing database schema...");
+        await this.initializeSchema();
+        // Retry the query
+        await this.query(
+          "INSERT INTO people (slack_id, display_name) VALUES ($1, $2) ON CONFLICT (slack_id) DO UPDATE SET display_name = $2, updated_at = CURRENT_TIMESTAMP",
+          [slackId, displayName]
+        );
+      } else {
+        throw error;
+      }
+    }
   }
 
   async getPerson(slackId: string): Promise<any> {

@@ -11,10 +11,11 @@ export class Database {
       throw new Error("DATABASE_URL environment variable is not set.");
     }
 
-    const connectionString = `${dbUrl}?sslmode=no-verify`;
-
     this.pool = new Pool({
-      connectionString: connectionString,
+      connectionString: dbUrl,
+      ssl: {
+        rejectUnauthorized: false,
+      },
     });
   }
 

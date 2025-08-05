@@ -405,8 +405,16 @@ app.action("admin_test_dm", async ({ ack, body, client }) => {
         },
       ],
     });
-  } catch (error) {
-    await errorHandler.handle(error, "admin_test_dm", { userId });
+  } catch (error: any) {
+    console.error(`Admin test DM failed for ${userId}:`, error.message);
+    if (error.data?.error === 'missing_scope') {
+      await client.chat.postMessage({
+        channel: userId,
+        text: "❌ Test DM failed: The app is missing the 'conversations:open' scope. Please update the app permissions in Slack app settings."
+      });
+    } else {
+      await errorHandler.handle(error, "admin_test_dm", { userId });
+    }
   }
 });
 
@@ -714,15 +722,20 @@ app.view("need_help_modal", async ({ ack, body, view, client }) => {
     // Find helpers for this need
     const helpers = await helperMatchingService.findHelpers(needText, userId);
 
-    // Create DM with user
-    const dmChannel = await client.conversations.open({ users: userId });
+    try {
+      // Create DM with user
+      const dmChannel = await client.conversations.open({ users: userId });
 
-    // Format and send results
-    const results = formatHelperResults(helpers, needText);
-    await client.chat.postMessage({
-      channel: dmChannel.channel?.id || "",
-      ...results,
-    });
+      // Format and send results
+      const results = formatHelperResults(helpers, needText);
+      await client.chat.postMessage({
+        channel: dmChannel.channel?.id || "",
+        ...results,
+      });
+    } catch (dmError: any) {
+      console.error(`Could not send DM to ${userId}:`, dmError.message);
+      throw new Error(`Unable to send results via DM. Please check app permissions.`);
+    }
   } catch (error) {
     await errorHandler.handle(error, "need_help_modal", {
       userId: body.user.id,
@@ -782,19 +795,25 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
 
     // Send confirmation
     if (addedSkills.length > 0 || removedSkills.length > 0) {
-      const dmChannel = await client.conversations.open({ users: userId });
-      let message = "✅ Skills updated!\n";
-      if (addedSkills.length > 0) {
-        message += `\n*Added:* ${addedSkills.join(", ")}`;
-      }
-      if (removedSkills.length > 0) {
-        message += `\n*Removed:* ${removedSkills.join(", ")}`;
-      }
+      try {
+        const dmChannel = await client.conversations.open({ users: userId });
+        let message = "✅ Skills updated!\n";
+        if (addedSkills.length > 0) {
+          message += `\n*Added:* ${addedSkills.join(", ")}`;
+        }
+        if (removedSkills.length > 0) {
+          message += `\n*Removed:* ${removedSkills.join(", ")}`;
+        }
 
-      await client.chat.postMessage({
-        channel: dmChannel.channel?.id || "",
-        text: message,
-      });
+        await client.chat.postMessage({
+          channel: dmChannel.channel?.id || "",
+          text: message,
+        });
+      } catch (dmError: any) {
+        // If we can't send a DM (missing scope or other issue), log it but don't fail the whole operation
+        console.warn(`Could not send DM confirmation to ${userId}:`, dmError.message);
+        // Skills were still updated successfully, just couldn't send confirmation
+      }
     }
   } catch (error) {
     await errorHandler.handle(error, "manage_skills_modal", {

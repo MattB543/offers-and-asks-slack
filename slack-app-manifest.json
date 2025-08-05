@@ -20,6 +20,7 @@
       "bot": [
         "chat:write",
         "im:write",
+        "conversations:open",
         "users:read",
         "channels:read",
         "commands"

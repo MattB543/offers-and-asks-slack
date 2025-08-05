@@ -86,6 +86,7 @@ const formatHelperResults = (helpers: any[], needText: string) => {
 app.event("app_home_opened", async ({ event, client }) => {
   try {
     const userId = event.user;
+    console.log(`📱 App home opened by user: ${userId}`);
 
     // Ensure user exists in database
     const userInfo = await client.users.info({ user: userId });
@@ -96,6 +97,7 @@ app.event("app_home_opened", async ({ event, client }) => {
 
     // Get user's skills
     const userSkills = await db.getPersonSkills(userId);
+    console.log(`📱 User ${userId} has ${userSkills.length} skills`);
 
     // Build blocks for the home view
     const blocks: any[] = [
@@ -228,15 +230,41 @@ app.event("app_home_opened", async ({ event, client }) => {
       );
     }
 
-    await client.views.publish({
+    console.log(`📱 Publishing home view with ${blocks.length} blocks`);
+    
+    const publishResult = await client.views.publish({
       user_id: userId,
       view: {
         type: "home",
         blocks,
       },
     });
+    
+    console.log(`📱 Home view published successfully for user ${userId}:`, publishResult.ok);
   } catch (error) {
+    console.error(`❌ Error in app_home_opened for user ${event.user}:`, error);
     await errorHandler.handle(error, "app_home_opened", { userId: event.user });
+    
+    // Try to at least show a simple message if view publishing fails
+    try {
+      await client.views.publish({
+        user_id: event.user,
+        view: {
+          type: "home",
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "*Welcome to Offers and Asks! 🤝*\n\nDM me with what you need help with, and I'll find teammates with matching skills.\n\nExample: 'I need help with React testing'"
+              }
+            }
+          ]
+        }
+      });
+    } catch (fallbackError) {
+      console.error(`❌ Even fallback view failed:`, fallbackError);
+    }
   }
 });
 

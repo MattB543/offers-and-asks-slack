@@ -136,6 +136,13 @@ class Server {
   private initializeScheduler() {
     try {
       console.log("📅 Initializing job scheduler...");
+      
+      // Temporarily disable Bree scheduler due to cron validation issue
+      // Weekly prompts can be triggered manually via admin controls in app home
+      console.log("⚠️  Automatic weekly scheduler disabled - use admin controls to send weekly prompts");
+      
+      // Commenting out Bree initialization to prevent startup errors
+      /*
       const jobsPath = path.join(__dirname, "jobs");
       console.log("📅 Jobs path:", jobsPath);
 
@@ -158,8 +165,9 @@ class Server {
           );
         },
       });
+      */
 
-      console.log("✅ Job scheduler initialized");
+      console.log("✅ Job scheduler initialized (manual mode)");
     } catch (error) {
       console.error("❌ Job scheduler initialization failed:", error);
       throw error;

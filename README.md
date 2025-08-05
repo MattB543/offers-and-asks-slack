@@ -50,6 +50,7 @@ cp .env.example .env
 ```
 
 Required environment variables:
+
 - `SLACK_BOT_TOKEN`: Your Slack bot token (xoxb-...)
 - `SLACK_SIGNING_SECRET`: Your Slack app signing secret
 - `OPENAI_API_KEY`: Your OpenAI API key
@@ -69,6 +70,7 @@ npm run seed-skills seed-sample
 ### 4. Slack App Configuration
 
 **Option A: Use the App Manifest (Recommended)**
+
 1. Create a new Slack app at https://api.slack.com/apps
 2. Choose "From an app manifest"
 3. Use the `slack-app-manifest.json` file in this repository
@@ -76,11 +78,11 @@ npm run seed-skills seed-sample
 5. Install the app to your workspace
 
 **Option B: Manual Configuration**
+
 1. Create a new Slack app at https://api.slack.com/apps
 2. Configure OAuth scopes:
    - `chat:write`
    - `im:write` (required for DMs)
-   - `conversations:open`
    - `users:read`
    - `channels:read`
    - `commands` (optional)
@@ -110,7 +112,7 @@ npm start
 ### For Team Members
 
 1. **Add Skills**: Visit the app home to manage your skills
-2. **Find Help**: 
+2. **Find Help**:
    - Use the "Find Helpers" button in app home
    - Respond to weekly DM prompts
    - Send a DM to the bot
@@ -145,25 +147,27 @@ npm run weekly-prompt         # Run weekly prompt job manually
 ### 🚀 **Simple Deployment (Recommended)**
 
 **DigitalOcean App Platform** ($3/month)
+
 1. Fork this repository
 2. Create new App → Connect GitHub repo
 3. Set environment variables in dashboard
 4. Deploy! (Auto-detected as Node.js app)
 
 **Heroku** ($7/month)
-1. Fork this repository  
+
+1. Fork this repository
 2. Create new Heroku app → Connect GitHub
 3. Add Heroku Postgres addon
 4. Deploy! (One-click with `app.json`)
 
 **Railway** ($5/month)
+
 1. Connect GitHub repo
 2. Add PostgreSQL service
 3. Set environment variables
 4. Deploy automatically
 
 > **Zero complexity!** These platforms auto-detect Node.js and handle everything.
-
 
 ## Skills Management
 
@@ -219,6 +223,7 @@ ISC License - see LICENSE file for details.
 ## Support
 
 For issues and questions:
+
 1. Check the troubleshooting section below
 2. Open an issue on GitHub
 3. Check Slack app logs for error messages
@@ -228,20 +233,24 @@ For issues and questions:
 ### Common Issues
 
 **Database Connection Issues**
+
 - Ensure PostgreSQL is running and accessible
 - Verify DATABASE_URL is correct
 - Check that pgvector extension is installed: `CREATE EXTENSION vector;`
 
 **Slack Events Not Received**
+
 - Verify your app's Request URL is publicly accessible
 - Check Slack app configuration and permissions
 - Ensure SLACK_SIGNING_SECRET is correct
 
 **OpenAI API Issues**
+
 - Verify OPENAI_API_KEY is valid and has sufficient credits
 - Check rate limits if processing many skills at once
 
 **Weekly Jobs Not Running**
+
 - Check server logs for Bree scheduler errors
 - Verify timezone configuration for cron jobs
 - Ensure the server stays running (use PM2 or similar in production)
@@ -249,6 +258,7 @@ For issues and questions:
 ### Debug Mode
 
 Set `NODE_ENV=development` to:
+
 - Disable admin error notifications
 - Get more verbose logging
 - Enable development-specific features

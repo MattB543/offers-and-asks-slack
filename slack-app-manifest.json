@@ -2,7 +2,8 @@
   "display_information": {
     "name": "Offers and Asks",
     "description": "AI-powered skill matching to connect team members who need help with those who have the right expertise",
-    "background_color": "#2c3e50"
+    "background_color": "#2c3e50",
+    "long_description": "Offers and Asks uses AI to match team members who need help with those who have the right skills. Team members can add their skills, request help through DMs or the app home, and receive intelligent matches based on semantic similarity of skills and needs."
   },
   "features": {
     "app_home": {
@@ -19,7 +20,6 @@
       "bot": [
         "chat:write",
         "im:write",
-        "conversations:open",
         "users:read",
         "channels:read",
         "commands"
@@ -28,12 +28,12 @@
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://YOUR-DOMAIN/slack/events",
+      "request_url": "https://offers-and-asks-slack-nbgim.ondigitalocean.app/slack/events",
       "bot_events": ["app_home_opened", "message.im"]
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "https://YOUR-DOMAIN/slack/events"
+      "request_url": "https://offers-and-asks-slack-nbgim.ondigitalocean.app/slack/events"
     },
     "socket_mode_enabled": false
   }

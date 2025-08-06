@@ -8,6 +8,7 @@ export interface HelperSkill {
 
 export interface Helper {
   id: string;
+  slack_user_id?: string;
   name: string;
   skills: HelperSkill[];
   score?: number;
@@ -58,6 +59,7 @@ export class HelperMatchingService {
         if (!helper) {
           helper = {
             id: row.slack_id,
+            slack_user_id: row.slack_user_id,
             name: row.display_name || 'Unknown',
             skills: [],
             score: row.score,

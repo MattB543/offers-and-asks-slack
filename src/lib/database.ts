@@ -232,7 +232,7 @@ export class Database {
     limit: number = 20
   ): Promise<any[]> {
     const result = await this.query(
-      `SELECT p.slack_id, p.display_name,
+      `SELECT p.slack_id, p.slack_user_id, p.display_name,
               p.expertise, p.projects, p.offers,
               s.skill,
               1 - (s.embedding <=> $1::vector) AS score

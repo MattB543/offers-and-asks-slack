@@ -175,9 +175,9 @@ const formatHelperResults = (helpers: any[], needText: string) => {
   const helperBlocks: any[] = [];
 
   helpers.slice(0, 5).forEach((helper) => {
-    // Only create Slack link if ID starts with 'U' (valid user ID)
-    const userDisplay = helper.id.startsWith("U")
-      ? `<@${helper.id}>`
+    // Use slack_user_id for proper user mentions, fallback to name
+    const userDisplay = helper.slack_user_id && helper.slack_user_id.startsWith("U")
+      ? `<@${helper.slack_user_id}>`
       : helper.name;
 
     // Build Fellow details text

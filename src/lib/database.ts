@@ -100,8 +100,14 @@ export class Database {
   // Person management methods
   async createPerson(slackId: string, displayName: string): Promise<void> {
     try {
+      // Insert or update using slack_user_id as the proper identifier
       await this.query(
-        "INSERT INTO people (slack_id, display_name) VALUES ($1, $2) ON CONFLICT (slack_id) DO UPDATE SET display_name = $2, updated_at = CURRENT_TIMESTAMP",
+        `INSERT INTO people (slack_id, slack_user_id, display_name) 
+         VALUES ($1, $1, $2) 
+         ON CONFLICT (slack_id) DO UPDATE SET 
+           slack_user_id = $1,
+           display_name = $2, 
+           updated_at = CURRENT_TIMESTAMP`,
         [slackId, displayName]
       );
     } catch (error: any) {
@@ -111,7 +117,12 @@ export class Database {
         await this.initializeSchema();
         // Retry the query
         await this.query(
-          "INSERT INTO people (slack_id, display_name) VALUES ($1, $2) ON CONFLICT (slack_id) DO UPDATE SET display_name = $2, updated_at = CURRENT_TIMESTAMP",
+          `INSERT INTO people (slack_id, slack_user_id, display_name) 
+           VALUES ($1, $1, $2) 
+           ON CONFLICT (slack_id) DO UPDATE SET 
+             slack_user_id = $1,
+             display_name = $2, 
+             updated_at = CURRENT_TIMESTAMP`,
           [slackId, displayName]
         );
       } else {
@@ -121,10 +132,19 @@ export class Database {
   }
 
   async getPerson(slackId: string): Promise<any> {
-    const result = await this.query(
-      "SELECT * FROM people WHERE slack_id = $1",
+    // First try by slack_user_id, then fallback to slack_id
+    let result = await this.query(
+      "SELECT * FROM people WHERE slack_user_id = $1",
       [slackId]
     );
+    
+    if (result.rows.length === 0) {
+      result = await this.query(
+        "SELECT * FROM people WHERE slack_id = $1",
+        [slackId]
+      );
+    }
+    
     return result.rows[0];
   }
 
@@ -174,29 +194,56 @@ export class Database {
   }
 
   // Person-skill relationship methods
-  async addPersonSkill(slackId: string, skillId: number): Promise<void> {
+  async addPersonSkill(slackUserId: string, skillId: number): Promise<void> {
+    // Find the person's internal slack_id using their slack_user_id
+    const person = await this.getPerson(slackUserId);
+    if (!person) {
+      throw new Error(`Person not found for slack_user_id: ${slackUserId}`);
+    }
+    
     await this.query(
       "INSERT INTO person_skills (slack_id, skill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-      [slackId, skillId]
+      [person.slack_id, skillId]
     );
   }
 
-  async removePersonSkill(slackId: string, skillId: number): Promise<void> {
+  async removePersonSkill(slackUserId: string, skillId: number): Promise<void> {
+    // Find the person's internal slack_id using their slack_user_id
+    const person = await this.getPerson(slackUserId);
+    if (!person) {
+      throw new Error(`Person not found for slack_user_id: ${slackUserId}`);
+    }
+    
     await this.query(
       "DELETE FROM person_skills WHERE slack_id = $1 AND skill_id = $2",
-      [slackId, skillId]
+      [person.slack_id, skillId]
     );
   }
 
   async getPersonSkills(slackId: string): Promise<any[]> {
-    const result = await this.query(
+    // First try to find by slack_user_id, then fallback to slack_id
+    let result = await this.query(
       `SELECT s.id, s.skill 
        FROM skills s 
        JOIN person_skills ps ON s.id = ps.skill_id 
-       WHERE ps.slack_id = $1
+       JOIN people p ON ps.slack_id = p.slack_id
+       WHERE p.slack_user_id = $1
        ORDER BY s.skill`,
       [slackId]
     );
+    
+    // If no results found by slack_user_id, try by slack_id (backward compatibility)
+    if (result.rows.length === 0) {
+      result = await this.query(
+        `SELECT s.id, s.skill 
+         FROM skills s 
+         JOIN person_skills ps ON s.id = ps.skill_id 
+         WHERE ps.slack_id = $1
+         ORDER BY s.skill`,
+        [slackId]
+      );
+    }
+    
     return result.rows;
   }
 

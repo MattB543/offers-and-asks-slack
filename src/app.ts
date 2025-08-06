@@ -174,6 +174,22 @@ export const app = receiver
 
 console.log("✅ Slack App created successfully");
 
+// Get bot user ID to prevent infinite loops
+let botUserId: string | null = null;
+
+// Rate limiting to prevent spam/loops (user -> last message timestamp)
+const userMessageTimestamps = new Map<string, number>();
+const MESSAGE_COOLDOWN_MS = 2000; // 2 seconds between messages per user
+(async () => {
+  try {
+    const authTest = await app.client.auth.test();
+    botUserId = authTest.user_id as string;
+    console.log("🤖 Bot User ID:", botUserId);
+  } catch (error) {
+    console.error("❌ Failed to get bot user ID:", error);
+  }
+})();
+
 // Helper function to check if user is admin
 const isAdmin = (userId: string): boolean => {
   const adminIds = (process.env.ADMIN_USER_ID || "")
@@ -829,36 +845,83 @@ app.message(async ({ message, client, say }) => {
       channel_type: (message as any).channel_type,
       subtype: (message as any).subtype,
       user: (message as any).user,
+      bot_id: (message as any).bot_id,
       text: (message as any).text?.substring(0, 50),
       channel: (message as any).channel
     });
 
-    // Only process DMs (not channel messages or bot messages)
-    // Check for both channel_type "im" and if it's a DM channel (starts with D)
+    // Comprehensive bot message filtering to prevent infinite loops
     const channelType = (message as any).channel_type;
     const channel = (message as any).channel;
     const subtype = (message as any).subtype;
+    const user = (message as any).user;
+    const botId = (message as any).bot_id;
     
+    // Check if this is a DM
     const isDM = channelType === "im" || (channel && channel.startsWith("D"));
-    const isBotMessage = subtype === "bot_message" || subtype === "message_changed" || subtype === "message_deleted";
+    if (!isDM) {
+      console.log("📨 Skipping - not a DM channel:", { channelType, channel });
+      return;
+    }
     
-    if (!isDM || isBotMessage) {
-      console.log("📨 Skipping message - not a user DM:", { isDM, isBotMessage, channelType, subtype });
+    // Filter out ALL bot messages to prevent infinite loops
+    const isFromThisBot = botUserId && user === botUserId;
+    const isFromAnyBot = !!botId || 
+                        subtype === "bot_message" || 
+                        (message as any).app_id || 
+                        (message as any).bot_profile;
+    const isSystemMessage = subtype === "message_changed" || 
+                           subtype === "message_deleted" || 
+                           subtype === "channel_join" || 
+                           subtype === "channel_leave" ||
+                           subtype === "file_share" ||
+                           subtype === "thread_broadcast";
+    const hasNoUser = !user; // System messages often have no user
+    
+    if (isFromThisBot || isFromAnyBot || isSystemMessage || hasNoUser) {
+      console.log("📨 Skipping bot/system message:", { 
+        isFromThisBot, 
+        isFromAnyBot, 
+        isSystemMessage, 
+        hasNoUser,
+        user,
+        botId,
+        subtype,
+        botUserId 
+      });
       return;
     }
 
-    const userId = (message as any).user;
+    const userId = user; // Use the already extracted user
     const messageText = (message as any).text;
     const ts = (message as any).ts;
 
-    // Skip if message is too short
-    if (!messageText || messageText.length < 3) {
+    // Additional safety checks
+    if (!userId || !messageText || !ts) {
+      console.log("📨 Skipping - missing required fields:", { userId: !!userId, messageText: !!messageText, ts: !!ts });
+      return;
+    }
+
+    // Rate limiting check to prevent spam/loops
+    const now = Date.now();
+    const lastMessageTime = userMessageTimestamps.get(userId) || 0;
+    if (now - lastMessageTime < MESSAGE_COOLDOWN_MS) {
+      console.log("📨 Skipping - rate limited:", { userId, cooldownMs: now - lastMessageTime });
+      return;
+    }
+    userMessageTimestamps.set(userId, now);
+
+    // Skip if message is too short or looks like a command/system message
+    if (messageText.length < 3 || messageText.startsWith("/") || messageText.startsWith("!")) {
       await say({
         thread_ts: ts,
         text: "Please describe what you need help with in more detail. For example: 'I need help setting up React testing with Jest'",
       });
       return;
     }
+
+    // We've passed all filters - this is a legitimate user message to process
+    console.log("✅ Processing legitimate user message:", { userId, messageText: messageText.substring(0, 100) });
 
     // Check for commands
     if (

@@ -1,5 +1,5 @@
 import { WebAPICallResult } from '@slack/web-api';
-import { InstallProvider, Installation } from '@slack/oauth';
+import { InstallProvider, Installation, InstallationQuery, Logger } from '@slack/oauth';
 import { db } from '../lib/database';
 
 interface SlackOAuthResponse extends WebAPICallResult {
@@ -78,19 +78,65 @@ class OAuthService {
    */
   async handleCallback(code: string, state?: string): Promise<Installation> {
     this.ensureConfigured();
+    
+    // Use the web API directly instead of the callback handler
+    const { WebClient } = await import('@slack/web-api');
+    
     try {
-      const result = await this.installer!.handleCallback({
-        code,
-        state,
+      const client = new WebClient();
+      const response = await client.oauth.v2.access({
+        client_id: process.env.SLACK_CLIENT_ID!,
+        client_secret: process.env.SLACK_CLIENT_SECRET!,
+        code: code,
+        ...(state && { state })
       });
+
+      if (!response.ok) {
+        throw new Error(`OAuth access failed: ${response.error}`);
+      }
+
+      const installation: Installation = {
+        team: {
+          id: response.team?.id!,
+          name: response.team?.name,
+        },
+        enterprise: undefined,
+        bot: {
+          token: response.access_token!,
+          userId: response.bot_user_id!,
+          id: response.bot_user_id!,
+          scopes: response.scope?.split(',') || [],
+        },
+        user: {
+          token: undefined,
+          refreshToken: undefined,
+          expiresAt: undefined,
+          scopes: undefined,
+          id: '',
+        },
+      };
+
+      // Add user if available
+      if (response.authed_user?.access_token) {
+        installation.user = {
+          token: response.authed_user.access_token,
+          refreshToken: undefined,
+          expiresAt: undefined,
+          scopes: undefined,
+          id: response.authed_user.id!,
+        };
+      }
+
+      // Store the installation using our custom store method
+      await this.storeInstallation(installation);
 
       console.log('✅ OAuth installation successful:', {
-        teamId: result.team?.id,
-        teamName: result.team?.name,
-        botUserId: result.bot?.userId,
+        teamId: installation.team?.id,
+        teamName: installation.team?.name,
+        botUserId: installation.bot?.userId,
       });
 
-      return result;
+      return installation;
     } catch (error) {
       console.error('❌ OAuth callback failed:', error);
       throw new Error(`OAuth callback failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -155,20 +201,22 @@ class OAuthService {
   /**
    * Fetch installation from database
    */
-  private async fetchInstallation(query: { teamId: string } | { userId: string }): Promise<Installation> {
+  private async fetchInstallation(query: InstallationQuery<boolean>, logger?: Logger): Promise<Installation> {
     try {
       let result;
       
-      if ('teamId' in query) {
+      if (query.teamId) {
         result = await db.query(
           'SELECT * FROM tenants WHERE team_id = $1 AND active = true',
           [query.teamId]
         );
-      } else {
+      } else if (query.userId) {
         result = await db.query(
           'SELECT * FROM tenants WHERE user_id = $1 AND active = true',
           [query.userId]
         );
+      } else {
+        throw new Error('Query must include teamId or userId');
       }
 
       if (result.rows.length === 0) {
@@ -177,21 +225,39 @@ class OAuthService {
 
       const tenant = result.rows[0];
       
-      return {
+      const installation: Installation = {
         team: {
           id: tenant.team_id,
           name: tenant.team_name,
         },
+        enterprise: undefined,
         bot: {
           token: tenant.bot_token,
           userId: tenant.bot_user_id,
           scopes: JSON.parse(tenant.scopes || '[]'),
+          id: tenant.bot_user_id,
         },
-        user: tenant.user_token ? {
-          id: tenant.user_id,
-          token: tenant.user_token,
-        } : undefined,
+        user: {
+          token: undefined,
+          refreshToken: undefined,
+          expiresAt: undefined,
+          scopes: undefined,
+          id: '',
+        },
       };
+
+      // Add user if available
+      if (tenant.user_token) {
+        installation.user = {
+          token: tenant.user_token,
+          refreshToken: undefined,
+          expiresAt: undefined,
+          scopes: undefined,
+          id: tenant.user_id,
+        };
+      }
+
+      return installation;
     } catch (error) {
       console.error('❌ Failed to fetch installation:', error);
       throw error;
@@ -201,14 +267,14 @@ class OAuthService {
   /**
    * Delete installation from database
    */
-  private async deleteInstallation(query: { teamId: string } | { userId: string }): Promise<void> {
+  private async deleteInstallation(query: InstallationQuery<boolean>, logger?: Logger): Promise<void> {
     try {
-      if ('teamId' in query) {
+      if (query.teamId) {
         await db.query(
           'UPDATE tenants SET active = false, updated_at = NOW() WHERE team_id = $1',
           [query.teamId]
         );
-      } else {
+      } else if (query.userId) {
         await db.query(
           'UPDATE tenants SET active = false, updated_at = NOW() WHERE user_id = $1',
           [query.userId]

@@ -6,91 +6,140 @@ import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
 import { sendWeeklyPrompts } from "./jobs/weekly-prompt";
 import { UserService } from "./services/users";
+import { oauthService } from "./services/oauth";
 
 config();
 
-// Create receiver - use ExpressReceiver if OAuth credentials are provided
+// Create receiver - use ExpressReceiver for OAuth support
 let receiver: ExpressReceiver | undefined;
 
 if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
   receiver = new ExpressReceiver({
     signingSecret: process.env.SLACK_SIGNING_SECRET!,
-    clientId: process.env.SLACK_CLIENT_ID,
-    clientSecret: process.env.SLACK_CLIENT_SECRET,
-    stateSecret: "my-state-secret",
-    scopes: [
-      "chat:write",
-      "im:write",
-      "users:read",
-      "channels:read",
-      "commands",
-    ],
-    installerOptions: {
-      userScopes: [],
+    installationStore: {
+      storeInstallation: async (installation) => {
+        // This will be handled by our OAuth service
+        return;
+      },
+      fetchInstallation: async (query) => {
+        // This will be handled by our OAuth service  
+        throw new Error('Use OAuth service for installation management');
+      },
     },
   });
 
-  // Add OAuth callback handler
-  receiver.router.get("/slack/oauth_redirect", async (req, res) => {
-    const code = req.query.code as string;
-
-    if (code) {
-      try {
-        // Exchange code for access token
-        const response = await receiver!.installer?.handleCallback(req, res, {
-          success: async (installation, installOptions, req, res) => {
-            console.log("\n🎉 ====== SLACK APP INSTALLED SUCCESSFULLY ======");
-            console.log(
-              "📝 Bot Token (add this to your .env as SLACK_BOT_TOKEN):"
-            );
-            console.log(`   ${installation.bot?.token}`);
-            console.log("📝 Team Info:");
-            console.log(`   Team ID: ${installation.team?.id}`);
-            console.log(`   Team Name: ${installation.team?.name}`);
-            console.log("================================================\n");
-
-            res.writeHead(200, { "Content-Type": "text/html" });
-            res.end(`
-              <html>
-                <body style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: 0 auto;">
-                  <h1>✅ Installation Successful!</h1>
-                  <p>The Offers and Asks app has been installed to your workspace.</p>
-                  <h2>Bot Token:</h2>
-                  <pre style="background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto;">
-${installation.bot?.token}
-                  </pre>
-                  <p><strong>⚠️ Important:</strong> Copy the bot token above and add it to your .env file as:</p>
-                  <pre style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
-SLACK_BOT_TOKEN=${installation.bot?.token}
-                  </pre>
-                  <p>You can now close this window.</p>
-                </body>
-              </html>
-            `);
-          },
-          failure: (error, installOptions, req, res) => {
-            console.error("❌ Installation failed:", error);
-            res.writeHead(500, { "Content-Type": "text/plain" });
-            res.end("Installation failed! Check server logs for details.");
-          },
-        });
-      } catch (error) {
-        console.error("❌ OAuth error:", error);
-        res.writeHead(500, { "Content-Type": "text/plain" });
-        res.end("OAuth error occurred");
-      }
-    } else {
-      res.writeHead(400, { "Content-Type": "text/plain" });
-      res.end("No code provided");
+  // OAuth install endpoint
+  receiver.router.get("/slack/install", async (req, res) => {
+    try {
+      const installUrl = oauthService.generateInstallUrl();
+      res.redirect(installUrl);
+    } catch (error) {
+      console.error("❌ Failed to generate install URL:", error);
+      res.status(500).send("Failed to generate install URL");
     }
   });
 
-  console.log("📱 OAuth installation enabled at /slack/oauth_redirect");
+  // OAuth callback handler
+  receiver.router.get("/slack/oauth_redirect", async (req, res) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+
+    if (!code) {
+      res.status(400).send("Authorization code missing");
+      return;
+    }
+
+    try {
+      const installation = await oauthService.handleCallback(code, state);
+      
+      res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Installation Successful</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+              .success { color: #28a745; }
+              .code { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; font-family: monospace; }
+              .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 15px 0; }
+            </style>
+          </head>
+          <body>
+            <h1 class="success">✅ Installation Successful!</h1>
+            <p>The <strong>Offers and Asks</strong> app has been successfully installed to <strong>${installation.team?.name}</strong>.</p>
+            
+            <div class="warning">
+              <strong>🎉 You're all set!</strong> The app is now ready to use in your workspace.
+              <br><br>
+              Try messaging the bot directly or visiting the App Home to get started.
+            </div>
+            
+            <p><small>You can now close this window.</small></p>
+          </body>
+        </html>
+      `);
+    } catch (error) {
+      console.error("❌ OAuth callback failed:", error);
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Installation Failed</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+              .error { color: #dc3545; }
+            </style>
+          </head>
+          <body>
+            <h1 class="error">❌ Installation Failed</h1>
+            <p>There was an error installing the app. Please try again or contact support.</p>
+            <p><small>Error: ${error instanceof Error ? error.message : 'Unknown error'}</small></p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  console.log("📱 OAuth endpoints enabled:");
+  console.log("   Install: /slack/install");
+  console.log("   Callback: /slack/oauth_redirect");
+}
+
+// Validate required environment variables
+if (!process.env.SLACK_SIGNING_SECRET) {
+  throw new Error('Required environment variable SLACK_SIGNING_SECRET is not set');
+}
+
+// Check if we have OAuth credentials OR bot token
+const hasOAuth = process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET;
+const hasBotToken = process.env.SLACK_BOT_TOKEN;
+
+if (!hasOAuth && !hasBotToken) {
+  console.error('❌ Missing Slack credentials. You need either:');
+  console.error('   1. OAuth: SLACK_CLIENT_ID + SLACK_CLIENT_SECRET (for multi-workspace)');
+  console.error('   2. Bot Token: SLACK_BOT_TOKEN (for single workspace)');
+  process.exit(1);
 }
 
 // Create app with or without OAuth receiver
 export const app = receiver
-  ? new App({ receiver, token: process.env.SLACK_BOT_TOKEN })
+  ? new App({ 
+      receiver,
+      authorize: async ({ teamId }) => {
+        // Multi-tenant: get token for specific team
+        if (teamId) {
+          const token = await oauthService.getBotToken(teamId);
+          if (token) {
+            return { botToken: token };
+          }
+        }
+        // Fallback to env token for single workspace mode
+        if (process.env.SLACK_BOT_TOKEN) {
+          return { botToken: process.env.SLACK_BOT_TOKEN };
+        }
+        throw new Error(`No token found for team ${teamId}`);
+      }
+    })
   : new App({
       signingSecret: process.env.SLACK_SIGNING_SECRET!,
       token: process.env.SLACK_BOT_TOKEN!,

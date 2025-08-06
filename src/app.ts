@@ -121,7 +121,8 @@ if (!process.env.SLACK_SIGNING_SECRET) {
 }
 
 // Check if we have OAuth credentials OR bot token
-const hasOAuth = process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET;
+// TEMPORARY: Force single-workspace mode to fix DM issue
+const hasOAuth = false; // process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET;
 const hasBotToken = process.env.SLACK_BOT_TOKEN;
 
 if (!hasOAuth && !hasBotToken) {
@@ -144,19 +145,24 @@ export const app = receiver
       receiver,
       authorize: async ({ teamId }) => {
         console.log("🔐 OAuth authorize called for team:", teamId);
-        // Multi-tenant: get token for specific team
+        
+        // Try to get token from OAuth service first
         if (teamId) {
           const token = await oauthService.getBotToken(teamId);
           if (token) {
-            console.log("✅ Found bot token for team:", teamId);
+            console.log("✅ Found OAuth bot token for team:", teamId);
             return { botToken: token };
           }
+          console.log("⚠️ No OAuth token found for team:", teamId);
         }
+        
         // Fallback to env token for single workspace mode
         if (process.env.SLACK_BOT_TOKEN) {
-          console.log("✅ Using fallback env bot token");
+          console.log("✅ Using fallback env bot token for team:", teamId);
           return { botToken: process.env.SLACK_BOT_TOKEN };
         }
+        
+        console.error(`❌ No token available for team ${teamId} - neither OAuth nor env token found`);
         throw new Error(`No token found for team ${teamId}`);
       }
     })

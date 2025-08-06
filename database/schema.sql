@@ -47,6 +47,21 @@ CREATE TABLE IF NOT EXISTS helper_suggestions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Multi-tenant installations table for OAuth
+CREATE TABLE IF NOT EXISTS tenants (
+  id SERIAL PRIMARY KEY,
+  team_id TEXT NOT NULL UNIQUE,
+  team_name TEXT,
+  bot_token TEXT NOT NULL,
+  bot_user_id TEXT,
+  user_token TEXT,
+  user_id TEXT,
+  scopes TEXT, -- JSON string
+  installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  active BOOLEAN DEFAULT TRUE
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_people_enabled ON people(enabled);
 CREATE INDEX IF NOT EXISTS idx_person_skills_user_id ON person_skills(user_id);

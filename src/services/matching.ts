@@ -11,6 +11,9 @@ export interface Helper {
   name: string;
   skills: HelperSkill[];
   score?: number;
+  expertise?: string;
+  projects?: string;
+  offers?: string;
 }
 
 export class HelperMatchingService {
@@ -43,7 +46,10 @@ export class HelperMatchingService {
             id: row.slack_id,
             name: row.display_name || 'Unknown',
             skills: [],
-            score: row.score
+            score: row.score,
+            expertise: row.expertise,
+            projects: row.projects,
+            offers: row.offers
           };
           helperMap.set(row.slack_id, helper);
         }

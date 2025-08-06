@@ -39,26 +39,66 @@ const formatHelperResults = (helpers: any[], needText: string) => {
     };
   }
 
-  const helperText = helpers
-    .slice(0, 5)
-    .map((helper) => {
-      // Format skills with bolding for high relevance and scores
+  // Build blocks for each helper
+  const helperBlocks: any[] = [];
+  
+  helpers.slice(0, 5).forEach((helper) => {
+    // Only create Slack link if ID starts with 'U' (valid user ID)
+    const userDisplay = helper.id.startsWith("U")
+      ? `<@${helper.id}>`
+      : helper.name;
+    
+    // Build Fellow details text
+    const fellowDetails: string[] = [];
+    if (helper.expertise) {
+      fellowDetails.push(`*Expertise:* ${helper.expertise}`);
+    }
+    if (helper.projects) {
+      fellowDetails.push(`*Projects:* ${helper.projects}`);
+    }
+    if (helper.offers) {
+      fellowDetails.push(`*Offers:* ${helper.offers}`);
+    }
+    
+    // Add main section with name and Fellow details
+    helperBlocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${userDisplay}*${fellowDetails.length > 0 ? '\n' + fellowDetails.join('\n') : ''}`,
+      },
+    });
+    
+    // Add skills in context block if they have any
+    if (helper.skills.length > 0) {
       const skillsText = helper.skills
         .slice(0, 3)
         .map((skillObj: HelperSkill) => {
-          const score = (skillObj.score * 100).toFixed(0);
           // Bold skills with >70% relevance
           if (skillObj.score > 0.7) {
-            return `*${skillObj.skill}* (${score}%)`;
+            return `*${skillObj.skill}*`;
           } else {
-            return `${skillObj.skill} (${score}%)`;
+            return skillObj.skill;
           }
         })
         .join(", ");
       
-      return `• <@${helper.id}> – ${skillsText}`;
-    })
-    .join("\n");
+      helperBlocks.push({
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `Skills from database: ${skillsText}`,
+          },
+        ],
+      });
+    }
+    
+    // Add a small divider between helpers
+    helperBlocks.push({
+      type: "divider",
+    });
+  });
 
   return {
     text: `Found ${helpers.length} people who might help with: "${needText}"`,
@@ -76,22 +116,7 @@ const formatHelperResults = (helpers: any[], needText: string) => {
       {
         type: "divider",
       },
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Top matches:*\n${helperText}`,
-        },
-      },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: "💡 Click on their names to send them a message!",
-          },
-        ],
-      },
+      ...helperBlocks,
     ],
   };
 };
@@ -297,7 +322,7 @@ app.event("app_home_opened", async ({ event, client }) => {
     }
 
     console.log(`📱 Publishing home view with ${blocks.length} blocks`);
-    
+
     const publishResult = await client.views.publish({
       user_id: userId,
       view: {
@@ -305,12 +330,15 @@ app.event("app_home_opened", async ({ event, client }) => {
         blocks,
       },
     });
-    
-    console.log(`📱 Home view published successfully for user ${userId}:`, publishResult.ok);
+
+    console.log(
+      `📱 Home view published successfully for user ${userId}:`,
+      publishResult.ok
+    );
   } catch (error) {
     console.error(`❌ Error in app_home_opened for user ${event.user}:`, error);
     await errorHandler.handle(error, "app_home_opened", { userId: event.user });
-    
+
     // Try to at least show a simple message if view publishing fails
     try {
       await client.views.publish({
@@ -322,11 +350,11 @@ app.event("app_home_opened", async ({ event, client }) => {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: "*Welcome to Offers and Asks! 🤝*\n\nDM me with what you need help with, and I'll find teammates with matching skills.\n\nExample: 'I need help with React testing'"
-              }
-            }
-          ]
-        }
+                text: "*Welcome to Offers and Asks! 🤝*\n\nDM me with what you need help with, and I'll find teammates with matching skills.\n\nExample: 'I need help with React testing'",
+              },
+            },
+          ],
+        },
       });
     } catch (fallbackError) {
       console.error(`❌ Even fallback view failed:`, fallbackError);
@@ -852,7 +880,7 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
     try {
       // Get updated user skills
       const updatedUserSkills = await db.getPersonSkills(userId);
-      
+
       // Build blocks for the home view (same logic as app_home_opened)
       const blocks: any[] = [
         {
@@ -893,7 +921,9 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
               type: "mrkdwn",
               text:
                 updatedUserSkills.length > 0
-                  ? `Skills: ${updatedUserSkills.map((s) => s.skill).join(", ")}`
+                  ? `Skills: ${updatedUserSkills
+                      .map((s) => s.skill)
+                      .join(", ")}`
                   : 'No skills added yet. Click "Manage Skills" to add some!',
             },
           ],
@@ -1043,9 +1073,14 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
         },
       });
 
-      console.log(`📱 Home view refreshed for user ${userId} after skills update`);
+      console.log(
+        `📱 Home view refreshed for user ${userId} after skills update`
+      );
     } catch (homeRefreshError: any) {
-      console.warn(`Could not refresh home view for ${userId}:`, homeRefreshError.message);
+      console.warn(
+        `Could not refresh home view for ${userId}:`,
+        homeRefreshError.message
+      );
       // Don't fail the whole operation if home refresh fails
     }
   } catch (error) {

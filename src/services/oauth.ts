@@ -57,7 +57,9 @@ class OAuthService {
     this.ensureConfigured();
     const scopes = [
       'chat:write',
-      'im:write', 
+      'im:write',
+      'im:read',
+      'im:history',
       'users:read',
       'channels:read',
       'commands'

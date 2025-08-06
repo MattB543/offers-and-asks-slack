@@ -19,22 +19,36 @@ export interface Helper {
 export class HelperMatchingService {
   async findHelpers(needText: string, requesterId?: string, limit: number = 5): Promise<Helper[]> {
     try {
-      // Generate embedding for the need
-      const needEmbedding = await embeddingService.generateEmbedding(needText);
+      // Extract specific skills needed using GPT-4
+      const extractedSkills = await embeddingService.extractSkills(needText);
+      console.log('Extracted skills:', extractedSkills);
       
-      // Store the need if requesterId is provided
+      // Generate embeddings for each extracted skill
+      const skillEmbeddings = await embeddingService.generateMultipleEmbeddings(extractedSkills);
+      
+      // Store the need with original text embedding if requesterId is provided
+      const needEmbedding = await embeddingService.generateEmbedding(needText);
       if (requesterId) {
         const weekStart = this.getWeekStart(new Date());
         await db.createWeeklyNeed(requesterId, needText, needEmbedding, weekStart);
       }
       
-      // Find similar helpers using vector similarity
-      const similarHelpers = await db.findSimilarHelpers(needEmbedding, 20);
+      // Find similar helpers for each skill and combine results
+      const allSimilarHelpers = [];
+      for (let i = 0; i < skillEmbeddings.length; i++) {
+        const skillHelpers = await db.findSimilarHelpers(skillEmbeddings[i], 10);
+        // Add skill context to each result
+        const skillHelpersWithContext = skillHelpers.map(helper => ({
+          ...helper,
+          matchedSkillQuery: extractedSkills[i]
+        }));
+        allSimilarHelpers.push(...skillHelpersWithContext);
+      }
       
       // Group by person and aggregate their top skills
       const helperMap = new Map<string, Helper>();
       
-      for (const row of similarHelpers) {
+      for (const row of allSimilarHelpers) {
         // Skip the requester from results
         if (requesterId && row.slack_id === requesterId) {
           continue;

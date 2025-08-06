@@ -63,11 +63,16 @@ class OAuthService {
       'commands'
     ];
 
+    // Use the redirect URI from the environment or default to your domain
+    const defaultRedirectUri = process.env.BASE_URL 
+      ? `${process.env.BASE_URL}/slack/oauth_redirect`
+      : 'https://offers-and-asks-slack-nbgim.ondigitalocean.app/slack/oauth_redirect';
+
     const baseUrl = 'https://slack.com/oauth/v2/authorize';
     const params = new URLSearchParams({
       client_id: process.env.SLACK_CLIENT_ID!,
       scope: scopes.join(','),
-      redirect_uri: redirectUri || `${process.env.BASE_URL}/slack/oauth_redirect`
+      redirect_uri: redirectUri || defaultRedirectUri
     });
 
     return `${baseUrl}?${params.toString()}`;

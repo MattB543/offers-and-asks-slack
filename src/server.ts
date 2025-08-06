@@ -110,18 +110,40 @@ class Server {
 
     // Check required environment variables
     console.log("🔍 Checking required environment variables...");
-    const requiredEnvVars = [
-      "SLACK_BOT_TOKEN",
+    
+    // Always required
+    const alwaysRequired = [
       "SLACK_SIGNING_SECRET",
       "OPENAI_API_KEY",
     ];
 
-    for (const envVar of requiredEnvVars) {
+    for (const envVar of alwaysRequired) {
       const exists = !!process.env[envVar];
       console.log(`🔍 ${envVar}: ${exists ? "✅ EXISTS" : "❌ MISSING"}`);
       if (!exists) {
         throw new Error(`Required environment variable ${envVar} is not set`);
       }
+    }
+
+    // Check if we have OAuth credentials OR bot token
+    const hasOAuth = process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET;
+    const hasBotToken = process.env.SLACK_BOT_TOKEN;
+
+    console.log(`🔍 SLACK_CLIENT_ID: ${!!process.env.SLACK_CLIENT_ID ? "✅ EXISTS" : "❌ MISSING"}`);
+    console.log(`🔍 SLACK_CLIENT_SECRET: ${!!process.env.SLACK_CLIENT_SECRET ? "✅ EXISTS" : "❌ MISSING"}`);
+    console.log(`🔍 SLACK_BOT_TOKEN: ${hasBotToken ? "✅ EXISTS" : "❌ MISSING"}`);
+
+    if (!hasOAuth && !hasBotToken) {
+      console.error('❌ Missing Slack credentials. You need either:');
+      console.error('   1. OAuth: SLACK_CLIENT_ID + SLACK_CLIENT_SECRET (for multi-workspace)');
+      console.error('   2. Bot Token: SLACK_BOT_TOKEN (for single workspace)');
+      throw new Error('Missing Slack credentials - need OAuth credentials or bot token');
+    }
+
+    if (hasOAuth) {
+      console.log("✅ OAuth credentials found - multi-workspace mode enabled");
+    } else {
+      console.log("✅ Bot token found - single workspace mode enabled");
     }
     console.log("✅ Environment variables check passed");
     console.log("✅ All health checks completed successfully");

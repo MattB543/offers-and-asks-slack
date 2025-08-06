@@ -3,7 +3,8 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- People table to store Slack users
 CREATE TABLE IF NOT EXISTS people (
-  slack_id TEXT PRIMARY KEY,
+  user_id TEXT PRIMARY KEY,
+  slack_user_id TEXT,
   display_name TEXT,
   enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,16 +21,16 @@ CREATE TABLE IF NOT EXISTS skills (
 
 -- Junction table for person-skill relationships
 CREATE TABLE IF NOT EXISTS person_skills (
-  slack_id TEXT REFERENCES people(slack_id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES people(user_id) ON DELETE CASCADE,
   skill_id INT REFERENCES skills(id) ON DELETE CASCADE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (slack_id, skill_id)
+  PRIMARY KEY (user_id, skill_id)
 );
 
 -- Weekly needs tracking table
 CREATE TABLE IF NOT EXISTS weekly_needs (
   id SERIAL PRIMARY KEY,
-  slack_id TEXT REFERENCES people(slack_id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES people(user_id) ON DELETE CASCADE,
   need_text TEXT NOT NULL,
   need_embedding vector(1536),
   week_start DATE NOT NULL,
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS weekly_needs (
 CREATE TABLE IF NOT EXISTS helper_suggestions (
   id SERIAL PRIMARY KEY,
   need_id INT REFERENCES weekly_needs(id) ON DELETE CASCADE,
-  helper_slack_id TEXT REFERENCES people(slack_id) ON DELETE CASCADE,
+  helper_user_id TEXT REFERENCES people(user_id) ON DELETE CASCADE,
   suggested_skills TEXT[],
   similarity_score FLOAT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -48,10 +49,10 @@ CREATE TABLE IF NOT EXISTS helper_suggestions (
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_people_enabled ON people(enabled);
-CREATE INDEX IF NOT EXISTS idx_person_skills_slack_id ON person_skills(slack_id);
+CREATE INDEX IF NOT EXISTS idx_person_skills_user_id ON person_skills(user_id);
 CREATE INDEX IF NOT EXISTS idx_person_skills_skill_id ON person_skills(skill_id);
 CREATE INDEX IF NOT EXISTS idx_weekly_needs_week_start ON weekly_needs(week_start);
-CREATE INDEX IF NOT EXISTS idx_weekly_needs_slack_id ON weekly_needs(slack_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_needs_user_id ON weekly_needs(user_id);
 
 -- Create HNSW index for vector similarity search (comment out if not needed initially)
 -- CREATE INDEX IF NOT EXISTS idx_skills_embedding_hnsw ON skills USING hnsw (embedding vector_cosine_ops);

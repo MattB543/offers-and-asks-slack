@@ -34,7 +34,7 @@ export async function sendWeeklyPrompts(): Promise<{
           try {
             // Send weekly prompt message directly to user
             await slackClient.chat.postMessage({
-              channel: user.slack_id,
+              channel: user.user_id,
               text: "What do you need help with this week?",
               blocks: [
                 {
@@ -68,12 +68,12 @@ export async function sendWeeklyPrompts(): Promise<{
             });
 
             successCount++;
-            console.log(`✅ Sent to ${user.display_name} (${user.slack_id})`);
+            console.log(`✅ Sent to ${user.display_name} (${user.user_id})`);
           } catch (userError: any) {
             errorCount++;
             const errorMsg = userError.message || String(userError);
             errors.push({
-              user: user.display_name || user.slack_id,
+              user: user.display_name || user.user_id,
               error: errorMsg,
             });
             console.error(`❌ Failed for ${user.display_name}:`, errorMsg);

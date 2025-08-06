@@ -98,17 +98,17 @@ export class Database {
   }
 
   // Person management methods
-  async createPerson(slackId: string, displayName: string): Promise<void> {
+  async createPerson(userId: string, displayName: string): Promise<void> {
     try {
       // Insert or update using slack_user_id as the proper identifier
       await this.query(
-        `INSERT INTO people (slack_id, slack_user_id, display_name) 
+        `INSERT INTO people (user_id, slack_user_id, display_name) 
          VALUES ($1, $1, $2) 
-         ON CONFLICT (slack_id) DO UPDATE SET 
+         ON CONFLICT (user_id) DO UPDATE SET 
            slack_user_id = $1,
            display_name = $2, 
            updated_at = CURRENT_TIMESTAMP`,
-        [slackId, displayName]
+        [userId, displayName]
       );
     } catch (error: any) {
       // If the table doesn't exist, try to initialize the schema
@@ -117,13 +117,13 @@ export class Database {
         await this.initializeSchema();
         // Retry the query
         await this.query(
-          `INSERT INTO people (slack_id, slack_user_id, display_name) 
+          `INSERT INTO people (user_id, slack_user_id, display_name) 
            VALUES ($1, $1, $2) 
-           ON CONFLICT (slack_id) DO UPDATE SET 
+           ON CONFLICT (user_id) DO UPDATE SET 
              slack_user_id = $1,
              display_name = $2, 
              updated_at = CURRENT_TIMESTAMP`,
-          [slackId, displayName]
+          [userId, displayName]
         );
       } else {
         throw error;
@@ -131,17 +131,17 @@ export class Database {
     }
   }
 
-  async getPerson(slackId: string): Promise<any> {
-    // First try by slack_user_id, then fallback to slack_id
+  async getPerson(userId: string): Promise<any> {
+    // First try by slack_user_id, then fallback to user_id
     let result = await this.query(
       "SELECT * FROM people WHERE slack_user_id = $1",
-      [slackId]
+      [userId]
     );
     
     if (result.rows.length === 0) {
       result = await this.query(
-        "SELECT * FROM people WHERE slack_id = $1",
-        [slackId]
+        "SELECT * FROM people WHERE user_id = $1",
+        [userId]
       );
     }
     
@@ -155,9 +155,9 @@ export class Database {
     return result.rows;
   }
 
-  async togglePersonEnabled(slackId: string, enabled: boolean): Promise<void> {
-    await this.query("UPDATE people SET enabled = $2 WHERE slack_id = $1", [
-      slackId,
+  async togglePersonEnabled(userId: string, enabled: boolean): Promise<void> {
+    await this.query("UPDATE people SET enabled = $2 WHERE user_id = $1", [
+      userId,
       enabled,
     ]);
   }
@@ -194,53 +194,53 @@ export class Database {
   }
 
   // Person-skill relationship methods
-  async addPersonSkill(slackUserId: string, skillId: number): Promise<void> {
-    // Find the person's internal slack_id using their slack_user_id
-    const person = await this.getPerson(slackUserId);
+  async addPersonSkill(userId: string, skillId: number): Promise<void> {
+    // Find the person's internal user_id using their slack_user_id
+    const person = await this.getPerson(userId);
     if (!person) {
-      throw new Error(`Person not found for slack_user_id: ${slackUserId}`);
+      throw new Error(`Person not found for user_id: ${userId}`);
     }
     
     await this.query(
-      "INSERT INTO person_skills (slack_id, skill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-      [person.slack_id, skillId]
+      "INSERT INTO person_skills (user_id, skill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [person.user_id, skillId]
     );
   }
 
-  async removePersonSkill(slackUserId: string, skillId: number): Promise<void> {
-    // Find the person's internal slack_id using their slack_user_id
-    const person = await this.getPerson(slackUserId);
+  async removePersonSkill(userId: string, skillId: number): Promise<void> {
+    // Find the person's internal user_id using their slack_user_id
+    const person = await this.getPerson(userId);
     if (!person) {
-      throw new Error(`Person not found for slack_user_id: ${slackUserId}`);
+      throw new Error(`Person not found for user_id: ${userId}`);
     }
     
     await this.query(
-      "DELETE FROM person_skills WHERE slack_id = $1 AND skill_id = $2",
-      [person.slack_id, skillId]
+      "DELETE FROM person_skills WHERE user_id = $1 AND skill_id = $2",
+      [person.user_id, skillId]
     );
   }
 
-  async getPersonSkills(slackId: string): Promise<any[]> {
-    // First try to find by slack_user_id, then fallback to slack_id
+  async getPersonSkills(userId: string): Promise<any[]> {
+    // First try to find by slack_user_id, then fallback to user_id
     let result = await this.query(
       `SELECT s.id, s.skill 
        FROM skills s 
        JOIN person_skills ps ON s.id = ps.skill_id 
-       JOIN people p ON ps.slack_id = p.slack_id
+       JOIN people p ON ps.user_id = p.user_id
        WHERE p.slack_user_id = $1
        ORDER BY s.skill`,
-      [slackId]
+      [userId]
     );
     
-    // If no results found by slack_user_id, try by slack_id (backward compatibility)
+    // If no results found by slack_user_id, try by user_id (backward compatibility)
     if (result.rows.length === 0) {
       result = await this.query(
         `SELECT s.id, s.skill 
          FROM skills s 
          JOIN person_skills ps ON s.id = ps.skill_id 
-         WHERE ps.slack_id = $1
+         WHERE ps.user_id = $1
          ORDER BY s.skill`,
-        [slackId]
+        [userId]
       );
     }
     
@@ -249,14 +249,14 @@ export class Database {
 
   // Weekly needs methods
   async createWeeklyNeed(
-    slackId: string,
+    userId: string,
     needText: string,
     needEmbedding: number[],
     weekStart: string
   ): Promise<number> {
     const result = await this.query(
-      "INSERT INTO weekly_needs (slack_id, need_text, need_embedding, week_start) VALUES ($1, $2, $3::vector, $4) RETURNING id",
-      [slackId, needText, `[${needEmbedding.join(",")}]`, weekStart]
+      "INSERT INTO weekly_needs (user_id, need_text, need_embedding, week_start) VALUES ($1, $2, $3::vector, $4) RETURNING id",
+      [userId, needText, `[${needEmbedding.join(",")}]`, weekStart]
     );
     return result.rows[0].id;
   }
@@ -265,7 +265,7 @@ export class Database {
     const result = await this.query(
       `SELECT wn.*, p.display_name 
        FROM weekly_needs wn
-       JOIN people p ON wn.slack_id = p.slack_id
+       JOIN people p ON wn.user_id = p.user_id
        WHERE wn.week_start = $1
        ORDER BY wn.created_at DESC`,
       [weekStart]
@@ -279,13 +279,13 @@ export class Database {
     limit: number = 20
   ): Promise<any[]> {
     const result = await this.query(
-      `SELECT p.slack_id, p.slack_user_id, p.display_name,
+      `SELECT p.user_id, p.slack_user_id, p.display_name,
               p.expertise, p.projects, p.offers,
               s.skill,
               1 - (s.embedding <=> $1::vector) AS score
        FROM skills s
        JOIN person_skills ps ON s.id = ps.skill_id
-       JOIN people p ON ps.slack_id = p.slack_id
+       JOIN people p ON ps.user_id = p.user_id
        WHERE p.enabled = TRUE 
          AND s.embedding IS NOT NULL
        ORDER BY score DESC

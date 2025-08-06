@@ -51,14 +51,14 @@ export class HelperMatchingService {
       
       for (const row of allSimilarHelpers) {
         // Skip the requester from results
-        if (requesterId && row.slack_id === requesterId) {
+        if (requesterId && row.user_id === requesterId) {
           continue;
         }
         
-        let helper = helperMap.get(row.slack_id);
+        let helper = helperMap.get(row.user_id);
         if (!helper) {
           helper = {
-            id: row.slack_id,
+            id: row.user_id,
             slack_user_id: row.slack_user_id,
             name: row.display_name || 'Unknown',
             skills: [],
@@ -67,7 +67,7 @@ export class HelperMatchingService {
             projects: row.projects,
             offers: row.offers
           };
-          helperMap.set(row.slack_id, helper);
+          helperMap.set(row.user_id, helper);
         }
         
         // Add skill with score if not already present and we have room

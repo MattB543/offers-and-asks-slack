@@ -1,18 +1,101 @@
-import { App } from "@slack/bolt";
+import { App, ExpressReceiver } from "@slack/bolt";
 import { config } from "dotenv";
 import { db } from "./lib/database";
 import { embeddingService } from "./lib/openai";
 import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
 import { sendWeeklyPrompts } from "./jobs/weekly-prompt";
+import { UserService } from "./services/users";
 
 config();
 
-export const app = new App({
-  signingSecret: process.env.SLACK_SIGNING_SECRET!,
-  token: process.env.SLACK_BOT_TOKEN!,
-  socketMode: false,
-});
+// Create receiver - use ExpressReceiver if OAuth credentials are provided
+let receiver: ExpressReceiver | undefined;
+
+if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
+  receiver = new ExpressReceiver({
+    signingSecret: process.env.SLACK_SIGNING_SECRET!,
+    clientId: process.env.SLACK_CLIENT_ID,
+    clientSecret: process.env.SLACK_CLIENT_SECRET,
+    stateSecret: "my-state-secret",
+    scopes: [
+      "chat:write",
+      "im:write",
+      "users:read",
+      "channels:read",
+      "commands",
+    ],
+    installerOptions: {
+      userScopes: [],
+    },
+  });
+
+  // Add OAuth callback handler
+  receiver.router.get("/slack/oauth_redirect", async (req, res) => {
+    const code = req.query.code as string;
+
+    if (code) {
+      try {
+        // Exchange code for access token
+        const response = await receiver!.installer?.handleCallback(req, res, {
+          success: async (installation, installOptions, req, res) => {
+            console.log("\n🎉 ====== SLACK APP INSTALLED SUCCESSFULLY ======");
+            console.log(
+              "📝 Bot Token (add this to your .env as SLACK_BOT_TOKEN):"
+            );
+            console.log(`   ${installation.bot?.token}`);
+            console.log("📝 Team Info:");
+            console.log(`   Team ID: ${installation.team?.id}`);
+            console.log(`   Team Name: ${installation.team?.name}`);
+            console.log("================================================\n");
+
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end(`
+              <html>
+                <body style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: 0 auto;">
+                  <h1>✅ Installation Successful!</h1>
+                  <p>The Offers and Asks app has been installed to your workspace.</p>
+                  <h2>Bot Token:</h2>
+                  <pre style="background: #f0f0f0; padding: 15px; border-radius: 5px; overflow-x: auto;">
+${installation.bot?.token}
+                  </pre>
+                  <p><strong>⚠️ Important:</strong> Copy the bot token above and add it to your .env file as:</p>
+                  <pre style="background: #f0f0f0; padding: 15px; border-radius: 5px;">
+SLACK_BOT_TOKEN=${installation.bot?.token}
+                  </pre>
+                  <p>You can now close this window.</p>
+                </body>
+              </html>
+            `);
+          },
+          failure: (error, installOptions, req, res) => {
+            console.error("❌ Installation failed:", error);
+            res.writeHead(500, { "Content-Type": "text/plain" });
+            res.end("Installation failed! Check server logs for details.");
+          },
+        });
+      } catch (error) {
+        console.error("❌ OAuth error:", error);
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("OAuth error occurred");
+      }
+    } else {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("No code provided");
+    }
+  });
+
+  console.log("📱 OAuth installation enabled at /slack/oauth_redirect");
+}
+
+// Create app with or without OAuth receiver
+export const app = receiver
+  ? new App({ receiver, token: process.env.SLACK_BOT_TOKEN })
+  : new App({
+      signingSecret: process.env.SLACK_SIGNING_SECRET!,
+      token: process.env.SLACK_BOT_TOKEN!,
+      socketMode: false,
+    });
 
 // Helper function to check if user is admin
 const isAdmin = (userId: string): boolean => {
@@ -41,13 +124,13 @@ const formatHelperResults = (helpers: any[], needText: string) => {
 
   // Build blocks for each helper
   const helperBlocks: any[] = [];
-  
+
   helpers.slice(0, 5).forEach((helper) => {
     // Only create Slack link if ID starts with 'U' (valid user ID)
     const userDisplay = helper.id.startsWith("U")
       ? `<@${helper.id}>`
       : helper.name;
-    
+
     // Build Fellow details text
     const fellowDetails: string[] = [];
     if (helper.expertise) {
@@ -59,16 +142,18 @@ const formatHelperResults = (helpers: any[], needText: string) => {
     if (helper.offers) {
       fellowDetails.push(`*Offers:* ${helper.offers}`);
     }
-    
+
     // Add main section with name and Fellow details
     helperBlocks.push({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*${userDisplay}*${fellowDetails.length > 0 ? '\n' + fellowDetails.join('\n') : ''}`,
+        text: `*${userDisplay}*${
+          fellowDetails.length > 0 ? "\n" + fellowDetails.join("\n") : ""
+        }`,
       },
     });
-    
+
     // Add skills in context block if they have any
     if (helper.skills.length > 0) {
       const skillsText = helper.skills
@@ -82,18 +167,18 @@ const formatHelperResults = (helpers: any[], needText: string) => {
           }
         })
         .join(", ");
-      
+
       helperBlocks.push({
         type: "context",
         elements: [
           {
             type: "mrkdwn",
-            text: `Skills from database: ${skillsText}`,
+            text: `Skills: ${skillsText}`,
           },
         ],
       });
     }
-    
+
     // Add a small divider between helpers
     helperBlocks.push({
       type: "divider",
@@ -316,6 +401,22 @@ app.event("app_home_opened", async ({ event, client }) => {
               },
               action_id: "admin_test_dm",
             },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "👥 List Users",
+              },
+              action_id: "admin_list_users",
+            },
+            {
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "🔄 Sync Users",
+              },
+              action_id: "admin_sync_users",
+            },
           ],
         }
       );
@@ -504,6 +605,121 @@ app.action("admin_test_dm", async ({ ack, body, client }) => {
   } catch (error: any) {
     console.error(`Admin test DM failed for ${userId}:`, error.message);
     await errorHandler.handle(error, "admin_test_dm", { userId });
+  }
+});
+
+// Admin action: List workspace users
+app.action("admin_list_users", async ({ ack, body, client }) => {
+  await ack();
+
+  const userId = (body as any).user.id;
+  if (!isAdmin(userId)) {
+    return;
+  }
+
+  try {
+    const userService = new UserService(client);
+    const users = await userService.fetchAllUsers();
+    const userList = userService.formatUserList(users);
+
+    await client.chat.postMessage({
+      channel: userId,
+      text: `Found ${users.length} users in workspace`,
+      blocks: [
+        {
+          type: "divider",
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `👥 *Found ${users.length} users in workspace*\n\nShowing first 20:`,
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: userList,
+          },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `Use the "Sync Users" button to add all users to the database`,
+            },
+          ],
+        },
+      ],
+    });
+  } catch (error: any) {
+    console.error(`Admin list users failed for ${userId}:`, error.message);
+    await errorHandler.handle(error, "admin_list_users", { userId });
+  }
+});
+
+// Admin action: Sync workspace users to database
+app.action("admin_sync_users", async ({ ack, body, client }) => {
+  await ack();
+
+  const userId = (body as any).user.id;
+  if (!isAdmin(userId)) {
+    return;
+  }
+
+  try {
+    await client.chat.postMessage({
+      channel: userId,
+      text: "Starting user sync...",
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "🔄 *Starting user sync...*\n\nThis may take a moment.",
+          },
+        },
+      ],
+    });
+
+    const userService = new UserService(client);
+    const { added, updated } = await userService.syncUsersToDatabase();
+
+    await client.chat.postMessage({
+      channel: userId,
+      text: `User sync complete: ${added} added, ${updated} updated`,
+      blocks: [
+        {
+          type: "divider",
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `✅ *User sync complete!*\n\n• *Added:* ${added} users\n• *Updated:* ${updated} users`,
+          },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "All workspace users have been synced to the database",
+            },
+          ],
+        },
+      ],
+    });
+  } catch (error: any) {
+    console.error(`Admin sync users failed for ${userId}:`, error.message);
+    await errorHandler.handle(error, "admin_sync_users", { userId });
+
+    await client.chat.postMessage({
+      channel: userId,
+      text: "❌ User sync failed. Check logs for details.",
+    });
   }
 });
 

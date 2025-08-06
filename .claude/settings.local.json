@@ -14,7 +14,8 @@
       "Bash(echo \"Exit code: $?\")",
       "Bash(grep:*)",
       "Bash(npm run setup-db:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }

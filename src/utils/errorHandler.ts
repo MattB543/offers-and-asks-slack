@@ -14,13 +14,8 @@ export class ErrorHandler {
       console.error(`[${context}] Metadata:`, metadata);
     }
 
-    // Skip Slack notifications in development
-    if (process.env.NODE_ENV === "development") {
-      return;
-    }
-
-    // Send admin notification if possible
-    await this.notifyAdminError(error, context, metadata);
+    // Always skip Slack notifications - only console log
+    return;
   }
 
   private async notifyAdminError(

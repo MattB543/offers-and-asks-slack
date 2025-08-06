@@ -795,15 +795,31 @@ app.action("admin_sync_users", async ({ ack, body, client }) => {
 // Handle direct messages - process needs and reply in thread
 app.message(async ({ message, client, say }) => {
   try {
+    console.log("📨 Received message:", {
+      channel_type: (message as any).channel_type,
+      subtype: (message as any).subtype,
+      user: (message as any).user,
+      text: (message as any).text?.substring(0, 50),
+      channel: (message as any).channel
+    });
+
     // Only process DMs (not channel messages or bot messages)
-    if ((message as any).channel_type !== "im" || (message as any).subtype) {
+    // Check for both channel_type "im" and if it's a DM channel (starts with D)
+    const channelType = (message as any).channel_type;
+    const channel = (message as any).channel;
+    const subtype = (message as any).subtype;
+    
+    const isDM = channelType === "im" || (channel && channel.startsWith("D"));
+    const isBotMessage = subtype === "bot_message" || subtype === "message_changed" || subtype === "message_deleted";
+    
+    if (!isDM || isBotMessage) {
+      console.log("📨 Skipping message - not a user DM:", { isDM, isBotMessage, channelType, subtype });
       return;
     }
 
     const userId = (message as any).user;
     const messageText = (message as any).text;
     const ts = (message as any).ts;
-    const channel = (message as any).channel;
 
     // Skip if message is too short
     if (!messageText || messageText.length < 3) {

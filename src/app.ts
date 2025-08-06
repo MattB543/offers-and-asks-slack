@@ -28,6 +28,16 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     },
   });
 
+  // Health endpoint
+  receiver.router.get("/health", async (req, res) => {
+    console.log("🏥 Health check endpoint hit");
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      message: "Server is running"
+    });
+  });
+
   // OAuth install endpoint
   receiver.router.get("/slack/install", async (req, res) => {
     try {
@@ -122,19 +132,29 @@ if (!hasOAuth && !hasBotToken) {
 }
 
 // Create app with or without OAuth receiver
+console.log("🔧 App setup:", {
+  hasReceiver: !!receiver,
+  hasOAuth: hasOAuth,
+  hasBotToken: hasBotToken,
+  socketMode: false
+});
+
 export const app = receiver
   ? new App({ 
       receiver,
       authorize: async ({ teamId }) => {
+        console.log("🔐 OAuth authorize called for team:", teamId);
         // Multi-tenant: get token for specific team
         if (teamId) {
           const token = await oauthService.getBotToken(teamId);
           if (token) {
+            console.log("✅ Found bot token for team:", teamId);
             return { botToken: token };
           }
         }
         // Fallback to env token for single workspace mode
         if (process.env.SLACK_BOT_TOKEN) {
+          console.log("✅ Using fallback env bot token");
           return { botToken: process.env.SLACK_BOT_TOKEN };
         }
         throw new Error(`No token found for team ${teamId}`);
@@ -145,6 +165,8 @@ export const app = receiver
       token: process.env.SLACK_BOT_TOKEN!,
       socketMode: false,
     });
+
+console.log("✅ Slack App created successfully");
 
 // Helper function to check if user is admin
 const isAdmin = (userId: string): boolean => {
@@ -793,7 +815,9 @@ app.action("admin_sync_users", async ({ ack, body, client }) => {
 });
 
 // Handle direct messages - process needs and reply in thread
+console.log("🚀 Registering DM message handler...");
 app.message(async ({ message, client, say }) => {
+  console.log("💬 MESSAGE HANDLER TRIGGERED!");
   try {
     console.log("📨 Received message:", {
       channel_type: (message as any).channel_type,
@@ -1390,6 +1414,48 @@ app.view("manage_skills_modal", async ({ ack, body, view, client }) => {
     });
   }
 });
+
+// Add comprehensive event logging to debug what events are being received
+app.event(/.+/, async ({ event, client }) => {
+  console.log("🔍 RECEIVED EVENT:", {
+    type: event.type,
+    user: (event as any).user,
+    channel: (event as any).channel,
+    channel_type: (event as any).channel_type,
+    subtype: (event as any).subtype,
+    text: (event as any).text?.substring(0, 50),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Add middleware to log all incoming requests
+if (receiver) {
+  receiver.router.use((req, res, next) => {
+    console.log("🌐 INCOMING REQUEST:", {
+      method: req.method,
+      url: req.url,
+      headers: {
+        'x-slack-signature': req.headers['x-slack-signature'] ? 'present' : 'missing',
+        'x-slack-request-timestamp': req.headers['x-slack-request-timestamp'] ? 'present' : 'missing',
+        'content-type': req.headers['content-type']
+      },
+      userAgent: req.headers['user-agent']?.substring(0, 50)
+    });
+    
+    // Specifically log Slack webhook events
+    if (req.url === '/slack/events' && req.method === 'POST') {
+      console.log("🎯 SLACK EVENT WEBHOOK HIT!");
+      
+      // Log body for Slack events (be careful with size)
+      if (req.body) {
+        console.log("📦 Event body type:", req.body.type);
+        console.log("📦 Event:", req.body.event?.type);
+      }
+    }
+    
+    next();
+  });
+}
 
 // Error handling for unhandled events
 app.error(async (error) => {

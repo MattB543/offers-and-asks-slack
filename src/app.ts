@@ -622,6 +622,9 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
     const users = await userService.fetchAllUsers();
     const userList = userService.formatUserList(users);
 
+    // Split user list into chunks if it's too long for a single message
+    const chunks = userList.match(/(?:[^\n]+\n?){1,50}/g) || [];
+    
     await client.chat.postMessage({
       channel: userId,
       text: `Found ${users.length} users in workspace`,
@@ -633,17 +636,28 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `👥 *Found ${users.length} users in workspace*\n\nShowing first 20:`,
+            text: `👥 *Found ${users.length} users in workspace*\n\nFormat: *Real Name* (display_name) - \`slack_id\``,
           },
         },
+      ],
+    });
+    
+    // Send user list in chunks to avoid message size limits
+    for (let i = 0; i < chunks.length; i++) {
+      const isLastChunk = i === chunks.length - 1;
+      const blocks: any[] = [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: userList,
+            text: chunks[i].trim(),
           },
         },
-        {
+      ];
+      
+      // Add context on last chunk
+      if (isLastChunk) {
+        blocks.push({
           type: "context",
           elements: [
             {
@@ -651,9 +665,15 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
               text: `Use the "Sync Users" button to add all users to the database`,
             },
           ],
-        },
-      ],
-    });
+        });
+      }
+      
+      await client.chat.postMessage({
+        channel: userId,
+        text: `Users ${i * 50 + 1}-${Math.min((i + 1) * 50, users.length)}`,
+        blocks,
+      });
+    }
   } catch (error: any) {
     console.error(`Admin list users failed for ${userId}:`, error.message);
     await errorHandler.handle(error, "admin_list_users", { userId });

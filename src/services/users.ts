@@ -81,10 +81,10 @@ export class UserService {
 
   formatUserList(users: SlackUser[]): string {
     return users
-      .slice(0, 20)
       .map((user, index) => {
-        const name = user.real_name || user.name || 'Unknown';
-        return `${index + 1}. ${name} - \`${user.id}\``;
+        const realName = user.real_name || 'N/A';
+        const displayName = user.name || 'N/A';
+        return `${index + 1}. *${realName}* (${displayName}) - \`${user.id}\``;
       })
       .join('\n');
   }

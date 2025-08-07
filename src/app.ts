@@ -22,8 +22,8 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         return;
       },
       fetchInstallation: async (query) => {
-        // This will be handled by our OAuth service  
-        throw new Error('Use OAuth service for installation management');
+        // This will be handled by our OAuth service
+        throw new Error("Use OAuth service for installation management");
       },
     },
   });
@@ -31,10 +31,10 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
   // Health endpoint
   receiver.router.get("/health", async (req, res) => {
     console.log("🏥 Health check endpoint hit");
-    res.status(200).json({ 
-      status: "ok", 
+    res.status(200).json({
+      status: "ok",
       timestamp: new Date().toISOString(),
-      message: "Server is running"
+      message: "Server is running",
     });
   });
 
@@ -61,7 +61,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
 
     try {
       const installation = await oauthService.handleCallback(code, state);
-      
+
       res.status(200).send(`
         <!DOCTYPE html>
         <html>
@@ -103,7 +103,9 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           <body>
             <h1 class="error">❌ Installation Failed</h1>
             <p>There was an error installing the app. Please try again or contact support.</p>
-            <p><small>Error: ${error instanceof Error ? error.message : 'Unknown error'}</small></p>
+            <p><small>Error: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }</small></p>
           </body>
         </html>
       `);
@@ -117,7 +119,9 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
 
 // Validate required environment variables
 if (!process.env.SLACK_SIGNING_SECRET) {
-  throw new Error('Required environment variable SLACK_SIGNING_SECRET is not set');
+  throw new Error(
+    "Required environment variable SLACK_SIGNING_SECRET is not set"
+  );
 }
 
 // Check if we have OAuth credentials OR bot token
@@ -126,9 +130,11 @@ const hasOAuth = false; // process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIE
 const hasBotToken = process.env.SLACK_BOT_TOKEN;
 
 if (!hasOAuth && !hasBotToken) {
-  console.error('❌ Missing Slack credentials. You need either:');
-  console.error('   1. OAuth: SLACK_CLIENT_ID + SLACK_CLIENT_SECRET (for multi-workspace)');
-  console.error('   2. Bot Token: SLACK_BOT_TOKEN (for single workspace)');
+  console.error("❌ Missing Slack credentials. You need either:");
+  console.error(
+    "   1. OAuth: SLACK_CLIENT_ID + SLACK_CLIENT_SECRET (for multi-workspace)"
+  );
+  console.error("   2. Bot Token: SLACK_BOT_TOKEN (for single workspace)");
   process.exit(1);
 }
 
@@ -137,15 +143,15 @@ console.log("🔧 App setup:", {
   hasReceiver: !!receiver,
   hasOAuth: hasOAuth,
   hasBotToken: hasBotToken,
-  socketMode: false
+  socketMode: false,
 });
 
 export const app = receiver
-  ? new App({ 
+  ? new App({
       receiver,
       authorize: async ({ teamId }) => {
         console.log("🔐 OAuth authorize called for team:", teamId);
-        
+
         // Try to get token from OAuth service first
         if (teamId) {
           const token = await oauthService.getBotToken(teamId);
@@ -155,16 +161,18 @@ export const app = receiver
           }
           console.log("⚠️ No OAuth token found for team:", teamId);
         }
-        
+
         // Fallback to env token for single workspace mode
         if (process.env.SLACK_BOT_TOKEN) {
           console.log("✅ Using fallback env bot token for team:", teamId);
           return { botToken: process.env.SLACK_BOT_TOKEN };
         }
-        
-        console.error(`❌ No token available for team ${teamId} - neither OAuth nor env token found`);
+
+        console.error(
+          `❌ No token available for team ${teamId} - neither OAuth nor env token found`
+        );
         throw new Error(`No token found for team ${teamId}`);
-      }
+      },
     })
   : new App({
       signingSecret: process.env.SLACK_SIGNING_SECRET!,
@@ -220,9 +228,10 @@ const formatHelperResults = (helpers: any[], needText: string) => {
 
   helpers.slice(0, 5).forEach((helper) => {
     // Use slack_user_id for proper user mentions, fallback to name
-    const userDisplay = helper.slack_user_id && helper.slack_user_id.startsWith("U")
-      ? `<@${helper.slack_user_id}>`
-      : helper.name;
+    const userDisplay =
+      helper.slack_user_id && helper.slack_user_id.startsWith("U")
+        ? `<@${helper.slack_user_id}>`
+        : helper.name;
 
     // Build Fellow details text
     const fellowDetails: string[] = [];
@@ -717,7 +726,7 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
 
     // Split user list into chunks if it's too long for a single message
     const chunks = userList.match(/(?:[^\n]+\n?){1,50}/g) || [];
-    
+
     await client.chat.postMessage({
       channel: userId,
       text: `Found ${users.length} users in workspace`,
@@ -734,7 +743,7 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
         },
       ],
     });
-    
+
     // Send user list in chunks to avoid message size limits
     for (let i = 0; i < chunks.length; i++) {
       const isLastChunk = i === chunks.length - 1;
@@ -747,7 +756,7 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
           },
         },
       ];
-      
+
       // Add context on last chunk
       if (isLastChunk) {
         blocks.push({
@@ -760,7 +769,7 @@ app.action("admin_list_users", async ({ ack, body, client }) => {
           ],
         });
       }
-      
+
       await client.chat.postMessage({
         channel: userId,
         text: `Users ${i * 50 + 1}-${Math.min((i + 1) * 50, users.length)}`,
@@ -847,7 +856,7 @@ app.message(async ({ message, client, say }) => {
       user: (message as any).user,
       bot_id: (message as any).bot_id,
       text: (message as any).text?.substring(0, 50),
-      channel: (message as any).channel
+      channel: (message as any).channel,
     });
 
     // Comprehensive bot message filtering to prevent infinite loops
@@ -856,38 +865,40 @@ app.message(async ({ message, client, say }) => {
     const subtype = (message as any).subtype;
     const user = (message as any).user;
     const botId = (message as any).bot_id;
-    
+
     // Check if this is a DM
     const isDM = channelType === "im" || (channel && channel.startsWith("D"));
     if (!isDM) {
       console.log("📨 Skipping - not a DM channel:", { channelType, channel });
       return;
     }
-    
+
     // Filter out ALL bot messages to prevent infinite loops
     const isFromThisBot = botUserId && user === botUserId;
-    const isFromAnyBot = !!botId || 
-                        subtype === "bot_message" || 
-                        (message as any).app_id || 
-                        (message as any).bot_profile;
-    const isSystemMessage = subtype === "message_changed" || 
-                           subtype === "message_deleted" || 
-                           subtype === "channel_join" || 
-                           subtype === "channel_leave" ||
-                           subtype === "file_share" ||
-                           subtype === "thread_broadcast";
+    const isFromAnyBot =
+      !!botId ||
+      subtype === "bot_message" ||
+      (message as any).app_id ||
+      (message as any).bot_profile;
+    const isSystemMessage =
+      subtype === "message_changed" ||
+      subtype === "message_deleted" ||
+      subtype === "channel_join" ||
+      subtype === "channel_leave" ||
+      subtype === "file_share" ||
+      subtype === "thread_broadcast";
     const hasNoUser = !user; // System messages often have no user
-    
+
     if (isFromThisBot || isFromAnyBot || isSystemMessage || hasNoUser) {
-      console.log("📨 Skipping bot/system message:", { 
-        isFromThisBot, 
-        isFromAnyBot, 
-        isSystemMessage, 
+      console.log("📨 Skipping bot/system message:", {
+        isFromThisBot,
+        isFromAnyBot,
+        isSystemMessage,
         hasNoUser,
         user,
         botId,
         subtype,
-        botUserId 
+        botUserId,
       });
       return;
     }
@@ -898,7 +909,11 @@ app.message(async ({ message, client, say }) => {
 
     // Additional safety checks
     if (!userId || !messageText || !ts) {
-      console.log("📨 Skipping - missing required fields:", { userId: !!userId, messageText: !!messageText, ts: !!ts });
+      console.log("📨 Skipping - missing required fields:", {
+        userId: !!userId,
+        messageText: !!messageText,
+        ts: !!ts,
+      });
       return;
     }
 
@@ -906,13 +921,20 @@ app.message(async ({ message, client, say }) => {
     const now = Date.now();
     const lastMessageTime = userMessageTimestamps.get(userId) || 0;
     if (now - lastMessageTime < MESSAGE_COOLDOWN_MS) {
-      console.log("📨 Skipping - rate limited:", { userId, cooldownMs: now - lastMessageTime });
+      console.log("📨 Skipping - rate limited:", {
+        userId,
+        cooldownMs: now - lastMessageTime,
+      });
       return;
     }
     userMessageTimestamps.set(userId, now);
 
     // Skip if message is too short or looks like a command/system message
-    if (messageText.length < 3 || messageText.startsWith("/") || messageText.startsWith("!")) {
+    if (
+      messageText.length < 3 ||
+      messageText.startsWith("/") ||
+      messageText.startsWith("!")
+    ) {
       await say({
         thread_ts: ts,
         text: "Please describe what you need help with in more detail. For example: 'I need help setting up React testing with Jest'",
@@ -921,7 +943,10 @@ app.message(async ({ message, client, say }) => {
     }
 
     // We've passed all filters - this is a legitimate user message to process
-    console.log("✅ Processing legitimate user message:", { userId, messageText: messageText.substring(0, 100) });
+    console.log("✅ Processing legitimate user message:", {
+      userId,
+      messageText: messageText.substring(0, 100),
+    });
 
     // Check for commands
     if (
@@ -968,18 +993,7 @@ app.message(async ({ message, client, say }) => {
         ...results,
       });
 
-      // Store the need in the database for tracking
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-      const needEmbedding = await embeddingService.generateEmbedding(
-        messageText
-      );
-      await db.createWeeklyNeed(
-        userId,
-        messageText,
-        needEmbedding,
-        weekStart.toISOString().split("T")[0]
-      );
+      // Weekly need is stored within HelperMatchingService to avoid duplication
     } catch (error) {
       // Update thinking message with error
       await client.chat.update({
@@ -1493,7 +1507,7 @@ app.event(/.+/, async ({ event, client }) => {
     channel_type: (event as any).channel_type,
     subtype: (event as any).subtype,
     text: (event as any).text?.substring(0, 50),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -1504,24 +1518,28 @@ if (receiver) {
       method: req.method,
       url: req.url,
       headers: {
-        'x-slack-signature': req.headers['x-slack-signature'] ? 'present' : 'missing',
-        'x-slack-request-timestamp': req.headers['x-slack-request-timestamp'] ? 'present' : 'missing',
-        'content-type': req.headers['content-type']
+        "x-slack-signature": req.headers["x-slack-signature"]
+          ? "present"
+          : "missing",
+        "x-slack-request-timestamp": req.headers["x-slack-request-timestamp"]
+          ? "present"
+          : "missing",
+        "content-type": req.headers["content-type"],
       },
-      userAgent: req.headers['user-agent']?.substring(0, 50)
+      userAgent: req.headers["user-agent"]?.substring(0, 50),
     });
-    
+
     // Specifically log Slack webhook events
-    if (req.url === '/slack/events' && req.method === 'POST') {
+    if (req.url === "/slack/events" && req.method === "POST") {
       console.log("🎯 SLACK EVENT WEBHOOK HIT!");
-      
+
       // Log body for Slack events (be careful with size)
       if (req.body) {
         console.log("📦 Event body type:", req.body.type);
         console.log("📦 Event:", req.body.event?.type);
       }
     }
-    
+
     next();
   });
 }

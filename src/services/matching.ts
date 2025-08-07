@@ -284,7 +284,7 @@ export class HelperMatchingService {
 
       // Get total active helpers
       const helpersResult = await db.query(
-        "SELECT COUNT(DISTINCT slack_id) as count FROM person_skills ps JOIN people p ON ps.slack_id = p.slack_id WHERE p.enabled = TRUE"
+        "SELECT COUNT(DISTINCT ps.user_id) as count FROM person_skills ps JOIN people p ON ps.user_id = p.user_id WHERE p.enabled = TRUE"
       );
 
       // Get average match scores for this week's suggestions
@@ -301,7 +301,7 @@ export class HelperMatchingService {
         SELECT s.skill, COUNT(*) as count
         FROM person_skills ps
         JOIN skills s ON ps.skill_id = s.id
-        JOIN people p ON ps.slack_id = p.slack_id
+        JOIN people p ON ps.user_id = p.user_id
         WHERE p.enabled = TRUE
         GROUP BY s.skill
         ORDER BY count DESC

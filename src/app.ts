@@ -184,6 +184,35 @@ console.log("✅ Slack App created successfully");
 
 // Get bot user ID to prevent infinite loops
 let botUserId: string | null = null;
+let botTeamId: string | null = null;
+let botTeamName: string | null = null;
+
+// Lightweight cache for user display names to enrich logs without spamming Slack API
+const userNameCache = new Map<
+  string,
+  { realName: string; displayName: string; updatedAt: number }
+>();
+const USER_NAME_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function getUserNames(
+  client: any,
+  userId: string
+): Promise<{ realName: string; displayName: string }> {
+  const cached = userNameCache.get(userId);
+  const now = Date.now();
+  if (cached && now - cached.updatedAt < USER_NAME_CACHE_TTL_MS) {
+    return { realName: cached.realName, displayName: cached.displayName };
+  }
+  try {
+    const info = await client.users.info({ user: userId });
+    const realName = info.user?.real_name || info.user?.name || "Unknown";
+    const displayName = info.user?.profile?.display_name || realName;
+    userNameCache.set(userId, { realName, displayName, updatedAt: now });
+    return { realName, displayName };
+  } catch {
+    return { realName: "Unknown", displayName: userId };
+  }
+}
 
 // Rate limiting to prevent spam/loops (user -> last message timestamp)
 const userMessageTimestamps = new Map<string, number>();
@@ -192,7 +221,13 @@ const MESSAGE_COOLDOWN_MS = 2000; // 2 seconds between messages per user
   try {
     const authTest = await app.client.auth.test();
     botUserId = authTest.user_id as string;
-    console.log("🤖 Bot User ID:", botUserId);
+    botTeamId = (authTest as any).team_id || null;
+    botTeamName = (authTest as any).team || null;
+    console.log("🤖 Bot identity:", {
+      botUserId,
+      botTeamId,
+      botTeamName,
+    });
   } catch (error) {
     console.error("❌ Failed to get bot user ID:", error);
   }
@@ -848,7 +883,10 @@ app.action("admin_sync_users", async ({ ack, body, client }) => {
 // Handle direct messages - process needs and reply in thread
 console.log("🚀 Registering DM message handler...");
 app.message(async ({ message, client, say }) => {
-  console.log("💬 MESSAGE HANDLER TRIGGERED!");
+  console.log("💬 MESSAGE HANDLER TRIGGERED!", {
+    teamId: botTeamId,
+    teamName: botTeamName,
+  });
   try {
     console.log("📨 Received message:", {
       channel_type: (message as any).channel_type,
@@ -857,6 +895,8 @@ app.message(async ({ message, client, say }) => {
       bot_id: (message as any).bot_id,
       text: (message as any).text?.substring(0, 50),
       channel: (message as any).channel,
+      teamId: botTeamId,
+      teamName: botTeamName,
     });
 
     // Comprehensive bot message filtering to prevent infinite loops
@@ -899,6 +939,7 @@ app.message(async ({ message, client, say }) => {
         botId,
         subtype,
         botUserId,
+        textPreview: (message as any).text?.substring(0, 50),
       });
       return;
     }
@@ -917,6 +958,9 @@ app.message(async ({ message, client, say }) => {
       return;
     }
 
+    // Resolve user names for richer logging
+    const { realName, displayName } = await getUserNames(client, userId);
+
     // Rate limiting check to prevent spam/loops
     const now = Date.now();
     const lastMessageTime = userMessageTimestamps.get(userId) || 0;
@@ -924,6 +968,8 @@ app.message(async ({ message, client, say }) => {
       console.log("📨 Skipping - rate limited:", {
         userId,
         cooldownMs: now - lastMessageTime,
+        nextAllowedInMs: MESSAGE_COOLDOWN_MS - (now - lastMessageTime),
+        teamId: botTeamId,
       });
       return;
     }
@@ -945,7 +991,13 @@ app.message(async ({ message, client, say }) => {
     // We've passed all filters - this is a legitimate user message to process
     console.log("✅ Processing legitimate user message:", {
       userId,
-      messageText: messageText.substring(0, 100),
+      userName: realName,
+      displayName,
+      channel,
+      threadTs: ts,
+      messageChars: messageText.length,
+      messagePreview: messageText.substring(0, 100),
+      teamId: botTeamId,
     });
 
     // Check for commands
@@ -975,6 +1027,11 @@ app.message(async ({ message, client, say }) => {
       thread_ts: ts,
       text: "🔍 Looking for helpers...",
     });
+    console.log("🧵 Posted thinking message:", {
+      channel,
+      threadTs: ts,
+      messageTs: (thinkingMsg as any).ts,
+    });
 
     try {
       // Find helpers for this need
@@ -991,6 +1048,12 @@ app.message(async ({ message, client, say }) => {
         channel,
         ts: thinkingMsg.ts!,
         ...results,
+      });
+      console.log("📤 Results posted:", {
+        channel,
+        updatedTs: thinkingMsg.ts,
+        helpersReturned: helpers.length,
+        topHelperNames: helpers.slice(0, 3).map((h) => h.name),
       });
 
       // Weekly need is stored within HelperMatchingService to avoid duplication

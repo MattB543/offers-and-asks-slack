@@ -62,13 +62,18 @@ export class HelperMatchingService {
           needEmbedding,
           weekStart
         );
-        console.log("🗄️  [HelperMatchingService] weekly need stored");
+        console.log("🗄️  [HelperMatchingService] weekly need stored", {
+          requesterId,
+          weekStart,
+          textPreview: needText.substring(0, 80),
+        });
       }
 
       // Find similar helpers for each skill and combine results
       const allSimilarHelpers = [] as any[];
       console.log(
-        "🔎 [HelperMatchingService] finding similar helpers per skill..."
+        "🔎 [HelperMatchingService] finding similar helpers per skill...",
+        { skillsCount: extractedSkills.length }
       );
       for (let i = 0; i < skillEmbeddings.length; i++) {
         console.log("🔎 [HelperMatchingService] querying for skill", {
@@ -82,6 +87,9 @@ export class HelperMatchingService {
         console.log("🔎 [HelperMatchingService] results", {
           index: i,
           count: skillHelpers.length,
+          sampleHelperNames: skillHelpers
+            .slice(0, 3)
+            .map((h: any) => h.display_name || h.user_id),
         });
         // Add skill context to each result
         const skillHelpersWithContext = skillHelpers.map((helper) => ({
@@ -157,12 +165,14 @@ export class HelperMatchingService {
         .sort((a, b) => (b.score || 0) - (a.score || 0));
       console.log("🧮 [HelperMatchingService] aggregated helpers", {
         count: aggregatedHelpers.length,
+        topNames: aggregatedHelpers.slice(0, 5).map((h) => h.name),
       });
 
       // Take top 10 for AI re-ranking
       const topForRerank = aggregatedHelpers.slice(0, 10);
       console.log("📊 [HelperMatchingService] top candidates for re-rank", {
         count: topForRerank.length,
+        topNames: topForRerank.slice(0, 5).map((h) => h.name),
       });
 
       // If fewer than or equal to limit, just return
@@ -186,7 +196,8 @@ export class HelperMatchingService {
           })
         );
         console.log(
-          "📚 [HelperMatchingService] fetched full skills for candidates"
+          "📚 [HelperMatchingService] fetched full skills for candidates",
+          { count: fullSkillsList.length }
         );
         const idToAllSkills = new Map(
           fullSkillsList.map((x) => [x.id, x.skills] as const)
@@ -211,6 +222,7 @@ export class HelperMatchingService {
         );
         console.log("🏁 [HelperMatchingService] re-rank complete", {
           returned: idsInOrder.length,
+          returnedIdsPreview: idsInOrder.slice(0, 5),
         });
 
         // Build a map for quick lookup and return in AI order
@@ -226,6 +238,7 @@ export class HelperMatchingService {
         const finalList = [...reRanked, ...remaining].slice(0, limit);
         console.log("✅ [HelperMatchingService] final list prepared", {
           returned: finalList.length,
+          names: finalList.slice(0, 5).map((h) => h.name),
         });
         return finalList;
       } catch (rerankError) {

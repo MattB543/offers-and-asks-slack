@@ -140,6 +140,7 @@ Rules:
       console.log("🧠 [EmbeddingService] rerankCandidates: success", {
         returned: ids.length,
         ms: Date.now() - start,
+        idsPreview: ids.slice(0, 5),
       });
       return ids;
     } catch (error) {

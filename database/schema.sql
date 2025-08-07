@@ -34,6 +34,13 @@ CREATE TABLE IF NOT EXISTS weekly_needs (
   need_text TEXT NOT NULL,
   need_embedding vector(1536),
   week_start DATE NOT NULL,
+  -- Tracking columns for processing steps (added via migration too)
+  skills_extracted TEXT[],
+  similarity_candidates JSONB,
+  reranked_ids TEXT[],
+  reranked_candidates JSONB,
+  processing_metadata JSONB,
+  error TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

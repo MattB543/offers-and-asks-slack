@@ -23,7 +23,9 @@ export class HelperMatchingService {
     requesterId?: string,
     limit: number = 5
   ): Promise<Helper[]> {
+    let needId: number | null = null;
     try {
+      const overallStart = Date.now();
       console.log("🎯 [HelperMatchingService] findHelpers: start", {
         needPreview: needText.substring(0, 120),
         requesterId,
@@ -31,6 +33,7 @@ export class HelperMatchingService {
       });
 
       // Extract specific skills needed using GPT-4
+      const skillExtractStart = Date.now();
       const extractedSkills = await embeddingService.extractSkills(needText);
       console.log("🎯 [HelperMatchingService] extracted skills", {
         count: extractedSkills.length,
@@ -38,6 +41,7 @@ export class HelperMatchingService {
       });
 
       // Generate embeddings for each extracted skill
+      const multiEmbedStart = Date.now();
       const skillEmbeddings = await embeddingService.generateMultipleEmbeddings(
         extractedSkills
       );
@@ -47,6 +51,7 @@ export class HelperMatchingService {
       });
 
       // Store the need with original text embedding if requesterId is provided
+      const needEmbedStart = Date.now();
       const needEmbedding = await embeddingService.generateEmbedding(needText);
       console.log("🎯 [HelperMatchingService] need embedding generated", {
         vectorLength: needEmbedding.length,
@@ -56,7 +61,7 @@ export class HelperMatchingService {
         console.log("🗄️  [HelperMatchingService] creating weekly need", {
           weekStart,
         });
-        await db.createWeeklyNeed(
+        needId = await db.createWeeklyNeed(
           requesterId,
           needText,
           needEmbedding,
@@ -67,10 +72,33 @@ export class HelperMatchingService {
           weekStart,
           textPreview: needText.substring(0, 80),
         });
+
+        // Persist initial processing data
+        try {
+          await db.updateWeeklyNeedProcessing(needId, {
+            skillsExtracted: extractedSkills,
+            processingMetadataJson: {
+              timings_ms: {
+                extract_skills: Date.now() - skillExtractStart,
+                embed_skills: Date.now() - multiEmbedStart,
+                embed_need: Date.now() - needEmbedStart,
+              },
+              need_text_length: needText.length,
+              skill_count: extractedSkills.length,
+              need_embedding_length: needEmbedding.length,
+            },
+          });
+        } catch (persistErr) {
+          console.warn("⚠️ Failed to persist initial processing data:", persistErr);
+        }
       }
 
       // Find similar helpers for each skill and combine results
       const allSimilarHelpers = [] as any[];
+      const bySkillCandidates: Array<{
+        skill: string;
+        candidates: Array<{ user_id: string; slack_user_id?: string; name?: string; score: number }>;
+      }> = [];
       console.log(
         "🔎 [HelperMatchingService] finding similar helpers per skill...",
         { skillsCount: extractedSkills.length }
@@ -97,6 +125,16 @@ export class HelperMatchingService {
           matchedSkillQuery: extractedSkills[i],
         }));
         allSimilarHelpers.push(...skillHelpersWithContext);
+
+        bySkillCandidates.push({
+          skill: extractedSkills[i],
+          candidates: skillHelpers.map((h: any) => ({
+            user_id: h.user_id,
+            slack_user_id: h.slack_user_id,
+            name: h.display_name,
+            score: h.score,
+          })),
+        });
       }
 
       // Group by person and aggregate their top skills
@@ -168,6 +206,26 @@ export class HelperMatchingService {
         topNames: aggregatedHelpers.slice(0, 5).map((h) => h.name),
       });
 
+      // Persist similarity candidates if we created a weekly need
+      try {
+        if (typeof needId === "number" && needId) {
+          await db.updateWeeklyNeedProcessing(needId, {
+            similarityCandidatesJson: {
+              by_skill: bySkillCandidates,
+              aggregated_top: aggregatedHelpers.slice(0, 20).map((h) => ({
+                user_id: h.id,
+                slack_user_id: h.slack_user_id,
+                name: h.name,
+                top_skills: h.skills.map((s) => ({ skill: s.skill, score: s.score })),
+                score: h.score,
+              })),
+            },
+          });
+        }
+      } catch (persistErr) {
+        console.warn("⚠️ Failed to persist similarity candidates:", persistErr);
+      }
+
       // Take top 10 for AI re-ranking
       const topForRerank = aggregatedHelpers.slice(0, 10);
       console.log("📊 [HelperMatchingService] top candidates for re-rank", {
@@ -177,6 +235,28 @@ export class HelperMatchingService {
 
       // If fewer than or equal to limit, just return
       if (topForRerank.length <= limit) {
+        // Persist final without rerank path
+        try {
+          if (typeof needId === "number" && needId) {
+            await db.updateWeeklyNeedProcessing(needId, {
+              rerankedCandidatesJson: {
+                final_list: topForRerank.map((h) => ({
+                  user_id: h.id,
+                  slack_user_id: h.slack_user_id,
+                  name: h.name,
+                  skills: h.skills,
+                  score: h.score,
+                })),
+              },
+              processingMetadataJson: {
+                finalized_without_rerank: true,
+                total_ms: Date.now() - overallStart,
+              },
+            });
+          }
+        } catch (persistErr) {
+          console.warn("⚠️ Failed to persist final results (no rerank):", persistErr);
+        }
         console.log("✅ [HelperMatchingService] returning without re-rank", {
           returned: topForRerank.length,
         });
@@ -240,16 +320,73 @@ export class HelperMatchingService {
           returned: finalList.length,
           names: finalList.slice(0, 5).map((h) => h.name),
         });
+
+        // Persist rerank outputs
+        try {
+          if (typeof needId === "number" && needId) {
+            await db.updateWeeklyNeedProcessing(needId, {
+              rerankedIds: idsInOrder,
+              rerankedCandidatesJson: {
+                final_list: finalList.map((h) => ({
+                  user_id: h.id,
+                  slack_user_id: h.slack_user_id,
+                  name: h.name,
+                  skills: h.skills,
+                  score: h.score,
+                })),
+              },
+              processingMetadataJson: {
+                finalized_without_rerank: false,
+                total_ms: Date.now() - overallStart,
+              },
+            });
+          }
+        } catch (persistErr) {
+          console.warn("⚠️ Failed to persist rerank outputs:", persistErr);
+        }
         return finalList;
       } catch (rerankError) {
         console.warn(
           "⚠️  [HelperMatchingService] re-ranking failed, using similarity order:",
           rerankError
         );
-        return aggregatedHelpers.slice(0, limit);
+        const fallback = aggregatedHelpers.slice(0, limit);
+        // Persist fallback
+        try {
+          if (typeof needId === "number" && needId) {
+            await db.updateWeeklyNeedProcessing(needId, {
+              rerankedIds: null,
+              rerankedCandidatesJson: {
+                final_list: fallback.map((h) => ({
+                  user_id: h.id,
+                  slack_user_id: h.slack_user_id,
+                  name: h.name,
+                  skills: h.skills,
+                  score: h.score,
+                })),
+              },
+              error: String(rerankError),
+              processingMetadataJson: {
+                rerank_failed: true,
+                total_ms: Date.now() - overallStart,
+              },
+            });
+          }
+        } catch (persistErr) {
+          console.warn("⚠️ Failed to persist fallback outputs:", persistErr);
+        }
+        return fallback;
       }
     } catch (error) {
       console.error("❌ [HelperMatchingService] Error finding helpers:", error);
+      // Best-effort: attempt to persist error if we created a weekly need in scope
+      try {
+        if (typeof needId === "number" && needId) {
+          await db.updateWeeklyNeedProcessing(needId, {
+            error: String(error),
+          });
+        }
+      } catch {}
       throw new Error(`Failed to find helpers: ${error}`);
     }
   }

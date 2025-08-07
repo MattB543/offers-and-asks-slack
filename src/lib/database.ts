@@ -261,6 +261,48 @@ export class Database {
     return result.rows[0].id;
   }
 
+  async updateWeeklyNeedProcessing(
+    needId: number,
+    params: {
+      skillsExtracted?: string[] | null;
+      similarityCandidatesJson?: any | null;
+      rerankedIds?: string[] | null;
+      rerankedCandidatesJson?: any | null;
+      processingMetadataJson?: any | null;
+      error?: string | null;
+    }
+  ): Promise<void> {
+    const {
+      skillsExtracted = null,
+      similarityCandidatesJson = null,
+      rerankedIds = null,
+      rerankedCandidatesJson = null,
+      processingMetadataJson = null,
+      error = null,
+    } = params;
+
+    await this.query(
+      `UPDATE weekly_needs
+       SET
+         skills_extracted = COALESCE($2, skills_extracted),
+         similarity_candidates = COALESCE($3::jsonb, similarity_candidates),
+         reranked_ids = COALESCE($4, reranked_ids),
+         reranked_candidates = COALESCE($5::jsonb, reranked_candidates),
+         processing_metadata = COALESCE($6::jsonb, processing_metadata),
+         error = COALESCE($7, error)
+       WHERE id = $1`,
+      [
+        needId,
+        skillsExtracted,
+        similarityCandidatesJson ? JSON.stringify(similarityCandidatesJson) : null,
+        rerankedIds,
+        rerankedCandidatesJson ? JSON.stringify(rerankedCandidatesJson) : null,
+        processingMetadataJson ? JSON.stringify(processingMetadataJson) : null,
+        error,
+      ]
+    );
+  }
+
   async getWeeklyNeeds(weekStart: string): Promise<any[]> {
     const result = await this.query(
       `SELECT wn.*, p.display_name 

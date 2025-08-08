@@ -1,4 +1,4 @@
-import { Client, Pool } from "pg";
+import { Pool, PoolClient } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -80,6 +80,27 @@ export class Database {
     }
   }
 
+  async runInTransaction<T>(
+    fn: (client: PoolClient) => Promise<T>
+  ): Promise<T> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("❌ Transaction rollback failed:", rollbackError);
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async initializeSchema(): Promise<void> {
     const schemaPath = path.join(__dirname, "../../database/schema.sql");
     const schema = fs.readFileSync(schemaPath, "utf8");
@@ -113,7 +134,9 @@ export class Database {
     } catch (error: any) {
       // If the table doesn't exist, try to initialize the schema
       if (error.message?.includes('relation "people" does not exist')) {
-        console.log("⚠️ People table doesn't exist, initializing database schema...");
+        console.log(
+          "⚠️ People table doesn't exist, initializing database schema..."
+        );
         await this.initializeSchema();
         // Retry the query
         await this.query(
@@ -137,14 +160,13 @@ export class Database {
       "SELECT * FROM people WHERE slack_user_id = $1",
       [userId]
     );
-    
+
     if (result.rows.length === 0) {
-      result = await this.query(
-        "SELECT * FROM people WHERE user_id = $1",
-        [userId]
-      );
+      result = await this.query("SELECT * FROM people WHERE user_id = $1", [
+        userId,
+      ]);
     }
-    
+
     return result.rows[0];
   }
 
@@ -200,7 +222,7 @@ export class Database {
     if (!person) {
       throw new Error(`Person not found for user_id: ${userId}`);
     }
-    
+
     await this.query(
       "INSERT INTO person_skills (user_id, skill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [person.user_id, skillId]
@@ -213,7 +235,7 @@ export class Database {
     if (!person) {
       throw new Error(`Person not found for user_id: ${userId}`);
     }
-    
+
     await this.query(
       "DELETE FROM person_skills WHERE user_id = $1 AND skill_id = $2",
       [person.user_id, skillId]
@@ -231,7 +253,7 @@ export class Database {
        ORDER BY s.skill`,
       [userId]
     );
-    
+
     // If no results found by slack_user_id, try by user_id (backward compatibility)
     if (result.rows.length === 0) {
       result = await this.query(
@@ -243,7 +265,7 @@ export class Database {
         [userId]
       );
     }
-    
+
     return result.rows;
   }
 
@@ -294,7 +316,9 @@ export class Database {
       [
         needId,
         skillsExtracted,
-        similarityCandidatesJson ? JSON.stringify(similarityCandidatesJson) : null,
+        similarityCandidatesJson
+          ? JSON.stringify(similarityCandidatesJson)
+          : null,
         rerankedIds,
         rerankedCandidatesJson ? JSON.stringify(rerankedCandidatesJson) : null,
         processingMetadataJson ? JSON.stringify(processingMetadataJson) : null,

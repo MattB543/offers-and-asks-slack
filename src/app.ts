@@ -115,6 +115,249 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
   console.log("📱 OAuth endpoints enabled:");
   console.log("   Install: /slack/install");
   console.log("   Callback: /slack/oauth_redirect");
+
+  // External endpoint to accept Slack-like message JSON with bearer token auth
+  receiver.router.post("/external/slack-message", async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+
+      if (!configuredToken) {
+        console.warn(
+          "⚠️ EXTERNAL_POST_BEARER_TOKEN (or BEARER_TOKEN) not set; rejecting external message"
+        );
+        res.status(503).json({
+          ok: false,
+          error: "endpoint_not_configured",
+          message:
+            "Server missing EXTERNAL_POST_BEARER_TOKEN; ask the admin to set it.",
+        });
+        return;
+      }
+
+      const authorizationHeader = req.headers["authorization"] as
+        | string
+        | undefined;
+      const presentedToken = authorizationHeader?.startsWith("Bearer ")
+        ? authorizationHeader.substring("Bearer ".length)
+        : undefined;
+
+      if (!presentedToken || presentedToken !== configuredToken) {
+        res.status(401).json({ ok: false, error: "unauthorized" });
+        return;
+      }
+
+      if (!req.is("application/json")) {
+        res.status(415).json({
+          ok: false,
+          error: "unsupported_media_type",
+          message: 'Content-Type must be "application/json"',
+        });
+        return;
+      }
+
+      const payload = req.body as any;
+      if (!payload || typeof payload !== "object") {
+        res.status(400).json({ ok: false, error: "invalid_json" });
+        return;
+      }
+
+      // Log a concise summary to avoid noisy logs
+      console.log("📨 Received external Slack message payload", {
+        hasText: typeof payload.text === "string",
+        hasChannel: typeof payload.channel === "string",
+        keys: Object.keys(payload).slice(0, 10),
+      });
+
+      // If the payload matches the SlackExport schema, persist to DB
+      const isSlackExportShape =
+        typeof payload.collection_time === "string" &&
+        payload.channels &&
+        typeof payload.channels === "object" &&
+        !Array.isArray(payload.channels);
+
+      let persistedExportId: number | undefined;
+      if (isSlackExportShape) {
+        try {
+          const { exportId } = await db.runInTransaction(async (client) => {
+            // 1) Top-level export record
+            const exportInsert = await client.query(
+              `INSERT INTO slack_export (collection_time, raw) VALUES ($1, $2::jsonb) RETURNING id`,
+              [payload.collection_time || null, JSON.stringify(payload)]
+            );
+            const exportId: number = exportInsert.rows[0].id;
+
+            // 2) Channel metadata and 3) messages
+            const channels: Record<string, any> = payload.channels;
+            for (const [channelName, channelData] of Object.entries(channels)) {
+              const channelId: string | null = channelData?.id || null;
+              const messageCount: number | null =
+                channelData?.message_count ?? null;
+              const threadRepliesCount: number | null =
+                channelData?.thread_replies_count ?? null;
+
+              const channelInsert = await client.query(
+                `INSERT INTO slack_channel_export (export_id, channel_id, channel_name, message_count, thread_replies_count)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (export_id, channel_id) DO UPDATE SET
+                   channel_name = EXCLUDED.channel_name,
+                   message_count = EXCLUDED.message_count,
+                   thread_replies_count = EXCLUDED.thread_replies_count
+                 RETURNING id`,
+                [
+                  exportId,
+                  channelId,
+                  channelName,
+                  messageCount,
+                  threadRepliesCount,
+                ]
+              );
+              const channelExportId: number = channelInsert.rows[0].id;
+
+              const messages: any[] = Array.isArray(channelData?.messages)
+                ? channelData.messages
+                : [];
+
+              const insertMessage = async (
+                msg: any,
+                isReply: boolean,
+                parentTs: string | null
+              ) => {
+                const ts: string = String(msg.timestamp);
+                const userId: string | null = msg.user ?? null;
+                const text: string | null = msg.text ?? null;
+                const messageType: string | null = msg.type ?? null;
+                const subtype: string | null = msg.subtype ?? null;
+                const threadTs: string | null = msg.thread_ts ?? null;
+                await client.query(
+                  `INSERT INTO slack_message (
+                    export_id,
+                    channel_export_id,
+                    channel_id,
+                    channel_name,
+                    ts,
+                    user_id,
+                    text,
+                    message_type,
+                    subtype,
+                    thread_ts,
+                    is_reply,
+                    parent_ts,
+                    raw
+                  ) VALUES (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb
+                  ) ON CONFLICT (channel_id, ts) DO NOTHING`,
+                  [
+                    exportId,
+                    channelExportId,
+                    channelId,
+                    channelName,
+                    ts,
+                    userId,
+                    text,
+                    messageType,
+                    subtype,
+                    threadTs,
+                    isReply,
+                    parentTs,
+                    JSON.stringify(msg),
+                  ]
+                );
+              };
+
+              for (const msg of messages) {
+                await insertMessage(msg, false, null);
+                const replies: any[] = Array.isArray(msg.replies)
+                  ? msg.replies
+                  : [];
+                for (const reply of replies) {
+                  await insertMessage(reply, true, String(msg.timestamp));
+                }
+              }
+            }
+
+            return { exportId };
+          });
+          persistedExportId = exportId;
+        } catch (dbError) {
+          console.error("❌ Failed to persist SlackExport:", dbError);
+          await errorHandler.handle(dbError, "persist_slack_export");
+          res.status(500).json({ ok: false, error: "db_persist_failed" });
+          return;
+        }
+      }
+
+      // Optionally forward to Slack if channel + text (or blocks) are provided
+      const channel: string | undefined = payload.channel;
+      const text: string | undefined = payload.text;
+      const blocks: any[] | undefined = payload.blocks;
+      const threadTs: string | undefined =
+        payload.thread_ts || payload.threadTs;
+
+      let posted = false;
+      let postResponse: any = undefined;
+
+      if (channel && (text || blocks)) {
+        // Resolve bot token: prefer team from payload/header, fallback to env
+        const teamId: string | undefined =
+          payload.teamId ||
+          payload.team_id ||
+          payload.team?.id ||
+          (req.headers["x-slack-team-id"] as string | undefined);
+
+        let botToken: string | null | undefined = undefined;
+        if (teamId) {
+          try {
+            botToken = await oauthService.getBotToken(teamId);
+          } catch (e) {
+            console.warn("⚠️ Failed to fetch bot token for team:", teamId, e);
+          }
+        }
+        if (!botToken) {
+          botToken = process.env.SLACK_BOT_TOKEN || null;
+        }
+
+        if (!botToken) {
+          res.status(503).json({
+            ok: false,
+            error: "no_bot_token_available",
+            message:
+              "No bot token available. Provide teamId for an installed workspace or set SLACK_BOT_TOKEN.",
+          });
+          return;
+        }
+
+        try {
+          postResponse = await app.client.chat.postMessage({
+            token: botToken,
+            channel,
+            text: text || undefined,
+            blocks: (blocks as any) || undefined,
+            thread_ts: threadTs || undefined,
+          });
+          posted = Boolean(postResponse?.ok);
+        } catch (e) {
+          console.error("❌ chat.postMessage failed:", e);
+          res.status(502).json({ ok: false, error: "slack_post_failed" });
+          return;
+        }
+      }
+
+      res.status(200).json({
+        ok: true,
+        status: "accepted",
+        posted,
+        slack: postResponse,
+        export_id: persistedExportId,
+      });
+    } catch (err) {
+      console.error("❌ External slack-message handler failed:", err);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+  console.log(
+    "🔐 External endpoint enabled: POST /external/slack-message (Bearer auth)"
+  );
 }
 
 // Validate required environment variables

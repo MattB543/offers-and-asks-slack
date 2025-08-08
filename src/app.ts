@@ -177,6 +177,15 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         !Array.isArray(payload.channels);
 
       let persistedExportId: number | undefined;
+      let persistSummary:
+        | {
+            channelsProcessed: number;
+            messagesInserted: number;
+            repliesInserted: number;
+            duplicatesSkipped: number;
+            channelsWithMissingId: number;
+          }
+        | undefined;
       if (isSlackExportShape) {
         try {
           const { exportId } = await db.runInTransaction(async (client) => {
@@ -189,6 +198,11 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
 
             // 2) Channel metadata and 3) messages
             const channels: Record<string, any> = payload.channels;
+            let channelsProcessed = 0;
+            let messagesInserted = 0;
+            let repliesInserted = 0;
+            let duplicatesSkipped = 0;
+            let channelsWithMissingId = 0;
             for (const [channelName, channelData] of Object.entries(channels)) {
               const channelId: string | null = channelData?.id || null;
               const messageCount: number | null =
@@ -213,10 +227,20 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 ]
               );
               const channelExportId: number = channelInsert.rows[0].id;
+              channelsProcessed += 1;
 
               const messages: any[] = Array.isArray(channelData?.messages)
                 ? channelData.messages
                 : [];
+
+              if (!channelId) {
+                channelsWithMissingId += 1;
+                if (messages.length > 0) {
+                  console.warn(
+                    `⚠️ Skipping message inserts for channel "${channelName}" because channel_id is missing`
+                  );
+                }
+              }
 
               const insertMessage = async (
                 msg: any,
@@ -229,7 +253,10 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 const messageType: string | null = msg.type ?? null;
                 const subtype: string | null = msg.subtype ?? null;
                 const threadTs: string | null = msg.thread_ts ?? null;
-                await client.query(
+                if (!channelId) {
+                  return false;
+                }
+                const result = await client.query(
                   `INSERT INTO slack_message (
                     export_id,
                     channel_export_id,
@@ -263,19 +290,41 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     JSON.stringify(msg),
                   ]
                 );
+                return result.rowCount === 1;
               };
 
               for (const msg of messages) {
-                await insertMessage(msg, false, null);
+                const inserted = await insertMessage(msg, false, null);
+                if (inserted) {
+                  messagesInserted += 1;
+                } else {
+                  duplicatesSkipped += 1; // either duplicate or missing channel id
+                }
                 const replies: any[] = Array.isArray(msg.replies)
                   ? msg.replies
                   : [];
                 for (const reply of replies) {
-                  await insertMessage(reply, true, String(msg.timestamp));
+                  const rInserted = await insertMessage(
+                    reply,
+                    true,
+                    String(msg.timestamp)
+                  );
+                  if (rInserted) {
+                    repliesInserted += 1;
+                  } else {
+                    duplicatesSkipped += 1;
+                  }
                 }
               }
             }
 
+            persistSummary = {
+              channelsProcessed,
+              messagesInserted,
+              repliesInserted,
+              duplicatesSkipped,
+              channelsWithMissingId,
+            };
             return { exportId };
           });
           persistedExportId = exportId;
@@ -349,6 +398,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         posted,
         slack: postResponse,
         export_id: persistedExportId,
+        persist: persistSummary,
       });
     } catch (err) {
       console.error("❌ External slack-message handler failed:", err);

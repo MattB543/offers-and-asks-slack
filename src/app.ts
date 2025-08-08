@@ -1,4 +1,5 @@
 import { App, ExpressReceiver } from "@slack/bolt";
+import express from "express";
 import { config } from "dotenv";
 import { db } from "./lib/database";
 import { embeddingService } from "./lib/openai";
@@ -27,6 +28,9 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
       },
     },
   });
+
+  // Parse JSON bodies only for external endpoints to avoid interfering with Slack signature verification
+  receiver.router.use("/external", express.json({ limit: "50mb" }));
 
   // Health endpoint
   receiver.router.get("/health", async (req, res) => {

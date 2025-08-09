@@ -89,7 +89,7 @@ Re-rank candidates based on:
 
 Rules:
 - Prefer candidates whose concrete experience clearly addresses the need
-- Use channel summaries/memberships only as additional weak evidence of topical fit
+- Treat channel summaries/memberships as meaningful evidence of topical fit; when channels clearly align with the need, weigh this alongside skills and experience
 - Break ties by higher specificity and stronger evidence in projects/offers
 - Output ONLY a JSON object with shape { "ids": ["candidate_user_id", ...] } of length ${finalCount}
 - Do not include any text before or after the JSON`;
@@ -262,7 +262,7 @@ Rules:
   }
 
   /**
-   * Generate a concise two-sentence summary explaining why a helper is a good fit for a need.
+   * Generate exactly three concise bullet points explaining why a helper is a good fit for a need.
    */
   async generateFitSummaryForHelper(input: {
     needText: string;
@@ -283,9 +283,12 @@ Rules:
   }): Promise<string> {
     const { needText, helper } = input;
     const systemPrompt =
-      "You write crisp, professional summaries for why a specific teammate is a great fit to help with a request." +
-      " Output exactly TWO sentences (no bullets). Avoid fluff; cite concrete skills, projects, offers, or channel context if relevant." +
-      " Prefer specificity over generalities. 2 sentences total, max ~60 words.";
+      "You write crisp, evidence-based, highly specific bullets explaining why this teammate is a strong fit for the given request." +
+      " Output exactly THREE bullet points as incomplete sentences, each starting with '- '." +
+      " Do not include their name, pronouns, or @mentions (the name is shown elsewhere)." +
+      " Use only information provided in the request and person fields; do not invent details." +
+      " Prioritize concrete evidence: directly relevant skills/experience, notable projects or offers, and relevant Slack channels (format as #channel_name) or recent message themes." +
+      " Prefer short 'why-they-fit' phrasing over raw skill lists. No fluff. Keep each bullet ~8–16 words. Output only the three bullets (no intro/outro).";
 
     const userPayload = {
       request: needText,
@@ -342,13 +345,80 @@ Rules:
       );
     }
 
-    // Trim to two sentences if model returns extra
-    const sentences = content
-      .replace(/\s+/g, " ")
-      .split(/(?<=[.!?])\s+/)
-      .filter((s) => s && s.trim().length > 0)
-      .slice(0, 2);
-    const result = sentences.join(" ").trim();
+    // Normalize to exactly three hyphen bullets, incomplete sentences if possible
+    const normalizeToBullets = (raw: string): string => {
+      const lines = raw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+
+      // Prefer existing bullet-like lines first
+      let bullets = lines
+        .map((l) => {
+          // Strip common bullet markers and normalize to '- '
+          const m = l.match(/^(?:[-*•—]\s*)(.*)$/);
+          let text = (m ? m[1] : l).trim();
+          // Remove accidental inclusion of name or slack mention
+          if (helper.name) {
+            const nameRe = new RegExp(
+              helper.name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"),
+              "ig"
+            );
+            text = text.replace(nameRe, "").trim();
+          }
+          if (helper.slack_user_id) {
+            const mention = `<@${helper.slack_user_id}>`;
+            const mentionRe = new RegExp(
+              mention.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "g"
+            );
+            text = text.replace(mentionRe, "").trim();
+          }
+          // Light length cap (~18 words); keep concise
+          const words = text.split(/\s+/).filter(Boolean);
+          if (words.length > 18) text = words.slice(0, 18).join(" ");
+          return text.length > 0 ? `- ${text}` : "";
+        })
+        .filter((l) => l);
+
+      // If we didn't get at least 3 bullet-ish lines, fall back to sentence split
+      if (bullets.length < 3) {
+        const sentences = raw
+          .replace(/\s+/g, " ")
+          .split(/(?<=[.!?])\s+/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+          .slice(0, 3);
+        bullets = sentences.map((s) => {
+          let t = s;
+          if (helper.name) {
+            const nameRe = new RegExp(
+              helper.name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"),
+              "ig"
+            );
+            t = t.replace(nameRe, "").trim();
+          }
+          if (helper.slack_user_id) {
+            const mention = `<@${helper.slack_user_id}>`;
+            const mentionRe = new RegExp(
+              mention.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+              "g"
+            );
+            t = t.replace(mentionRe, "").trim();
+          }
+          const words = t.split(/\s+/).filter(Boolean);
+          if (words.length > 18) t = words.slice(0, 18).join(" ");
+          return `- ${t}`;
+        });
+      }
+
+      // Enforce exactly three bullets
+      if (bullets.length > 3) bullets = bullets.slice(0, 3);
+      while (bullets.length < 3) bullets.push("- ");
+      return bullets.join("\n");
+    };
+
+    const result = normalizeToBullets(content).trim();
     return result || content;
   }
 }

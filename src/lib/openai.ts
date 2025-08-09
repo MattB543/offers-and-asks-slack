@@ -123,7 +123,7 @@ Rules:
         candidates: candidates.length,
         finalCount,
         needPreview: needText.substring(0, 100),
-        model: "gpt-4.1",
+        model: "gpt-5",
       });
 
       // Optionally DM full prompt to admin for inspection
@@ -157,13 +157,13 @@ Rules:
         console.warn("⚠️ Failed to DM rerank prompt to admin:", dmErr);
       }
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4.1",
+        model: "gpt-5",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: JSON.stringify(userContent) },
         ],
-        temperature: 0.1,
-        max_tokens: 400,
+        temperature: 1,
+        max_completion_tokens: 400,
       });
 
       const content = response.choices[0]?.message?.content?.trim();
@@ -202,10 +202,10 @@ Rules:
       const start = Date.now();
       console.log("🧠 [EmbeddingService] extractSkills: start", {
         needPreview: needText.substring(0, 120),
-        model: "gpt-4.1",
+        model: "gpt-5",
       });
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4.1",
+        model: "gpt-5",
         messages: [
           {
             role: "system",
@@ -216,8 +216,8 @@ Rules:
             content: needText,
           },
         ],
-        temperature: 0.2,
-        max_tokens: 500,
+        temperature: 1,
+        max_completion_tokens: 500,
       });
 
       const content = response.choices[0]?.message?.content?.trim();
@@ -287,15 +287,15 @@ export class ChannelSummarizerService {
     let content = response.choices[0]?.message?.content?.trim() || "";
     if (!content || content.length < 10) {
       // Fallback to a more permissive/completions-friendly model if result is empty
-      const fallbackModel = "gpt-4.1-mini";
+      const fallbackModel = "gpt-5-mini";
       const fallback = await this.openai.chat.completions.create({
         model: fallbackModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.2,
-        max_tokens: 250,
+        temperature: 1,
+        max_completion_tokens: 250,
       });
       content = fallback.choices[0]?.message?.content?.trim() || "";
       const summary = content

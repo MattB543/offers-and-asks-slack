@@ -89,7 +89,10 @@ export class HelperMatchingService {
             },
           });
         } catch (persistErr) {
-          console.warn("⚠️ Failed to persist initial processing data:", persistErr);
+          console.warn(
+            "⚠️ Failed to persist initial processing data:",
+            persistErr
+          );
         }
       }
 
@@ -97,7 +100,12 @@ export class HelperMatchingService {
       const allSimilarHelpers = [] as any[];
       const bySkillCandidates: Array<{
         skill: string;
-        candidates: Array<{ user_id: string; slack_user_id?: string; name?: string; score: number }>;
+        candidates: Array<{
+          user_id: string;
+          slack_user_id?: string;
+          name?: string;
+          score: number;
+        }>;
       }> = [];
       console.log(
         "🔎 [HelperMatchingService] finding similar helpers per skill...",
@@ -216,7 +224,10 @@ export class HelperMatchingService {
                 user_id: h.id,
                 slack_user_id: h.slack_user_id,
                 name: h.name,
-                top_skills: h.skills.map((s) => ({ skill: s.skill, score: s.score })),
+                top_skills: h.skills.map((s) => ({
+                  skill: s.skill,
+                  score: s.score,
+                })),
                 score: h.score,
               })),
             },
@@ -255,7 +266,10 @@ export class HelperMatchingService {
             });
           }
         } catch (persistErr) {
-          console.warn("⚠️ Failed to persist final results (no rerank):", persistErr);
+          console.warn(
+            "⚠️ Failed to persist final results (no rerank):",
+            persistErr
+          );
         }
         console.log("✅ [HelperMatchingService] returning without re-rank", {
           returned: topForRerank.length,
@@ -283,6 +297,29 @@ export class HelperMatchingService {
           fullSkillsList.map((x) => [x.id, x.skills] as const)
         );
 
+        // Build channels context: any channels that include at least one of the 10 candidates
+        const candidateSlackIds = topForRerank
+          .map((h) => h.slack_user_id)
+          .filter((id): id is string => !!id);
+
+        let channelsContext: Array<{
+          channel_id: string;
+          channel_name: string | null;
+          summary: string | null;
+          member_ids: string[];
+          member_names: string[];
+        }> = [];
+        try {
+          channelsContext = await db.getChannelsByMemberSlackIds(
+            candidateSlackIds
+          );
+        } catch (e) {
+          console.warn(
+            "⚠️ Failed to load channels context for rerank; proceeding without it",
+            e
+          );
+        }
+
         const idsInOrder = await embeddingService.rerankCandidates(
           needText,
           topForRerank.map((h) => ({
@@ -298,7 +335,8 @@ export class HelperMatchingService {
               score: s.score,
             })),
           })),
-          limit
+          limit,
+          channelsContext
         );
         console.log("🏁 [HelperMatchingService] re-rank complete", {
           returned: idsInOrder.length,

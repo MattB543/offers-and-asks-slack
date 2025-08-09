@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { WebClient } from "@slack/web-api";
 import { SKILL_EXTRACTION_CONTEXT } from "./promptContext";
 
 export class EmbeddingService {
@@ -71,16 +72,25 @@ export class EmbeddingService {
       skills: string[];
       matched_skills?: Array<{ skill: string; score?: number }>;
     }>,
-    finalCount: number = 5
+    finalCount: number = 5,
+    channelsContext?: Array<{
+      channel_id: string;
+      channel_name: string | null;
+      summary: string | null;
+      member_ids: string[];
+      member_names: string[];
+    }>
   ): Promise<string[]> {
     const systemPrompt = `You are an expert recruiter helping to match a person's request with the best teammates to help.
 Re-rank candidates based on:
 1) Direct skill relevance to the need
 2) Demonstrated expertise/projects/offers relevance
 3) Breadth and depth of adjacent skills
+4) Relevance of Slack channel participation to the need (use channels context below)
 
 Rules:
 - Prefer candidates whose concrete experience clearly addresses the need
+- Use channel summaries/memberships only as additional weak evidence of topical fit
 - Break ties by higher specificity and stronger evidence in projects/offers
 - Output ONLY a JSON object with shape { "ids": ["candidate_user_id", ...] } of length ${finalCount}
 - Do not include any text before or after the JSON`;
@@ -98,6 +108,13 @@ Rules:
         matched_skills: c.matched_skills,
       })),
       final_count: finalCount,
+      channels_context: (channelsContext || []).map((ch) => ({
+        channel_id: ch.channel_id,
+        channel_name: ch.channel_name,
+        summary: ch.summary,
+        member_ids: ch.member_ids,
+        member_names: ch.member_names,
+      })),
     };
 
     try {
@@ -108,6 +125,37 @@ Rules:
         needPreview: needText.substring(0, 100),
         model: "gpt-4.1",
       });
+
+      // Optionally DM full prompt to admin for inspection
+      try {
+        const adminId = process.env.ADMIN_USER_ID;
+        const slackToken = process.env.SLACK_BOT_TOKEN;
+        if (adminId && slackToken) {
+          const slack = new WebClient(slackToken);
+          const promptString = `System Prompt\n\n\`\`\`\n${systemPrompt}\n\`\`\`\n\nUser Content JSON\n\n\`\`\`json\n${JSON.stringify(
+            userContent,
+            null,
+            2
+          )}\n\`\`\``;
+          await slack.chat.postMessage({
+            channel: adminId,
+            text: `Rerank prompt for review`,
+            blocks: [
+              {
+                type: "header",
+                text: {
+                  type: "plain_text",
+                  text: "🔎 Rerank Prompt (debug)",
+                  emoji: true,
+                },
+              },
+              { type: "section", text: { type: "mrkdwn", text: promptString } },
+            ],
+          });
+        }
+      } catch (dmErr) {
+        console.warn("⚠️ Failed to DM rerank prompt to admin:", dmErr);
+      }
       const response = await this.openai.chat.completions.create({
         model: "gpt-4.1",
         messages: [
@@ -204,3 +252,65 @@ Rules:
 }
 
 export const embeddingService = new EmbeddingService();
+
+export class ChannelSummarizerService {
+  private openai: OpenAI;
+
+  constructor() {
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+
+  async summarizeChannel(
+    messages: string[],
+    model: string = "gpt-5-mini"
+  ): Promise<{ summary: string; model: string }> {
+    const systemPrompt =
+      "You are summarizing the purpose and typical content of a Slack channel. Produce 1 to 5 sentences, concise and general, avoiding proper names unless they indicate topics.";
+
+    // Preprocess: trim messages and cap token budget by slicing
+    const joined = messages
+      .map((m) => (m || "").replace(/[\s\u200B]+/g, " ").trim())
+      .filter((m) => m.length > 0)
+      .slice(-100) // cap to the most recent 100 messages
+      .join("\n- ");
+
+    const userPrompt = `Here are representative recent messages from a Slack channel. Write a concise summary in 1 to 5 sentences.\n\nMessages:\n- ${joined}`;
+
+    const response = await this.openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_completion_tokens: 250,
+    });
+    let content = response.choices[0]?.message?.content?.trim() || "";
+    if (!content || content.length < 10) {
+      // Fallback to a more permissive/completions-friendly model if result is empty
+      const fallbackModel = "gpt-4.1-mini";
+      const fallback = await this.openai.chat.completions.create({
+        model: fallbackModel,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 250,
+      });
+      content = fallback.choices[0]?.message?.content?.trim() || "";
+      const summary = content
+        .split("\n")
+        .filter((l) => l.trim().length > 0)
+        .join(" ");
+      return { summary, model: content ? fallbackModel : model };
+    }
+
+    const summary = content
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .join(" ");
+    return { summary, model };
+  }
+}
+
+export const channelSummarizerService = new ChannelSummarizerService();

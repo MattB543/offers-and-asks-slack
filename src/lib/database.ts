@@ -1,4 +1,6 @@
 import { Pool, PoolClient } from "pg";
+import { config } from "dotenv";
+config();
 import * as fs from "fs";
 import * as path from "path";
 
@@ -358,6 +360,38 @@ export class Database {
        LIMIT $2`,
       [`[${needEmbedding.join(",")}]`, limit]
     );
+    return result.rows;
+  }
+
+  // Fetch channels where any of the provided Slack user IDs are members,
+  // and include human-readable member names for each channel
+  async getChannelsByMemberSlackIds(memberSlackIds: string[]): Promise<
+    Array<{
+      channel_id: string;
+      channel_name: string | null;
+      summary: string | null;
+      member_ids: string[];
+      member_names: string[];
+    }>
+  > {
+    if (!memberSlackIds || memberSlackIds.length === 0) return [];
+
+    const result = await this.query(
+      `SELECT
+         scp.channel_id,
+         scp.channel_name,
+         scp.summary,
+         scp.member_ids,
+         ARRAY_AGG(DISTINCT COALESCE(p.display_name, m)) AS member_names
+       FROM slack_channel_profiles scp
+       LEFT JOIN LATERAL unnest(scp.member_ids) AS m ON TRUE
+       LEFT JOIN people p ON p.slack_user_id = m
+       WHERE scp.member_ids && $1::text[]
+       GROUP BY scp.channel_id, scp.channel_name, scp.summary, scp.member_ids
+       ORDER BY scp.channel_name NULLS LAST`,
+      [memberSlackIds]
+    );
+
     return result.rows;
   }
 

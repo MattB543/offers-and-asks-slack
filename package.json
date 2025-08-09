@@ -12,6 +12,7 @@
     "setup-db-safe": "node dist/scripts/setup-database.js || echo 'Database setup failed - continuing anyway'",
     "seed-skills": "ts-node src/scripts/seed-skills.ts",
     "weekly-prompt": "ts-node src/jobs/weekly-prompt.ts",
+    "channel-summaries": "ts-node src/jobs/channel-summaries.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

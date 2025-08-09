@@ -1,5 +1,5 @@
-import { WebClient } from '@slack/web-api';
-import { db } from '../lib/database';
+import { WebClient } from "@slack/web-api";
+import { db } from "../lib/database";
 
 export interface SlackUser {
   id: string;
@@ -19,33 +19,54 @@ export class UserService {
     this.client = client;
   }
 
+  async listChannelMembers(channelId: string): Promise<string[]> {
+    const memberIds: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const resp = await this.client.conversations.members({
+        channel: channelId,
+        cursor,
+        limit: 1000,
+      });
+      if (Array.isArray(resp.members))
+        memberIds.push(...(resp.members as string[]));
+      cursor = resp.response_metadata?.next_cursor;
+      // small delay to be nice to rate limits
+      if (cursor) await new Promise((r) => setTimeout(r, 200));
+    } while (cursor);
+    return memberIds;
+  }
+
   async fetchAllUsers(): Promise<SlackUser[]> {
     const users: SlackUser[] = [];
     let cursor: string | undefined;
-    
+
     try {
       do {
         const response = await this.client.users.list({
           cursor,
-          limit: 200
+          limit: 200,
         });
-        
+
         if (response.members) {
-          users.push(...response.members.filter(user => 
-            !user.is_bot && 
-            !user.is_app_user && 
-            !user.deleted &&
-            user.id !== 'USLACKBOT'
-          ) as SlackUser[]);
+          users.push(
+            ...(response.members.filter(
+              (user) =>
+                !user.is_bot &&
+                !user.is_app_user &&
+                !user.deleted &&
+                user.id !== "USLACKBOT"
+            ) as SlackUser[])
+          );
         }
-        
+
         cursor = response.response_metadata?.next_cursor;
       } while (cursor);
-      
+
       console.log(`✅ Fetched ${users.length} human users from workspace`);
       return users;
     } catch (error) {
-      console.error('❌ Error fetching users:', error);
+      console.error("❌ Error fetching users:", error);
       throw error;
     }
   }
@@ -54,13 +75,13 @@ export class UserService {
     const users = await this.fetchAllUsers();
     let added = 0;
     let updated = 0;
-    
+
     for (const user of users) {
-      const displayName = user.real_name || user.name || 'Unknown';
-      
+      const displayName = user.real_name || user.name || "Unknown";
+
       try {
         const existingUser = await db.getPerson(user.id);
-        
+
         if (!existingUser) {
           await db.createPerson(user.id, displayName);
           added++;
@@ -74,7 +95,7 @@ export class UserService {
         console.error(`❌ Error syncing user ${user.id}:`, error);
       }
     }
-    
+
     console.log(`✅ Sync complete: ${added} added, ${updated} updated`);
     return { added, updated };
   }
@@ -82,10 +103,10 @@ export class UserService {
   formatUserList(users: SlackUser[]): string {
     return users
       .map((user, index) => {
-        const realName = user.real_name || 'N/A';
-        const displayName = user.name || 'N/A';
+        const realName = user.real_name || "N/A";
+        const displayName = user.name || "N/A";
         return `${index + 1}. *${realName}* (${displayName}) - \`${user.id}\``;
       })
-      .join('\n');
+      .join("\n");
   }
 }

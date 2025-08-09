@@ -22,6 +22,8 @@
         "im:write",
         "users:read",
         "channels:read",
+        "groups:read",
+        "conversations:read",
         "commands"
       ]
     }

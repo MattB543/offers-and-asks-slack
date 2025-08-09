@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { WebClient } from "@slack/web-api";
 import { SKILL_EXTRACTION_CONTEXT } from "./promptContext";
 
 export class EmbeddingService {
@@ -123,46 +122,21 @@ Rules:
         candidates: candidates.length,
         finalCount,
         needPreview: needText.substring(0, 100),
-        model: "gpt-5",
+        model: "gpt-5-mini",
       });
 
-      // Optionally DM full prompt to admin for inspection
-      try {
-        const adminId = process.env.ADMIN_USER_ID;
-        const slackToken = process.env.SLACK_BOT_TOKEN;
-        if (adminId && slackToken) {
-          const slack = new WebClient(slackToken);
-          const promptFull = `System Prompt\n\n\`\`\`\n${systemPrompt}\n\`\`\`\n\nUser Content JSON\n\n\`\`\`json\n${JSON.stringify(
-            userContent,
-            null,
-            2
-          )}\n\`\`\``;
-          const maxLen = 2800;
-          const promptString =
-            promptFull.length > maxLen
-              ? promptFull.slice(0, maxLen) + "\n\n(truncated)"
-              : promptFull;
-          await slack.chat.postMessage({
-            channel: adminId,
-            text: `Rerank prompt for review`,
-            blocks: [
-              {
-                type: "header",
-                text: {
-                  type: "plain_text",
-                  text: "🔎 Rerank Prompt (debug)",
-                  emoji: true,
-                },
-              },
-              { type: "section", text: { type: "mrkdwn", text: promptString } },
-            ],
-          });
-        }
-      } catch (dmErr) {
-        console.warn("⚠️ Failed to DM rerank prompt to admin:", dmErr);
-      }
+      // Log full prompt for inspection instead of DM
+      const promptFull = `System Prompt\n\n\`\`\`\n${systemPrompt}\n\`\`\`\n\nUser Content JSON\n\n\`\`\`json\n${JSON.stringify(
+        userContent,
+        null,
+        2
+      )}\n\`\`\``;
+      console.log(
+        "🧪 [EmbeddingService] rerankCandidates prompt (full)",
+        promptFull
+      );
       // Try primary and fallback models for robustness
-      const models = ["gpt-5", "gpt-4.1", "gpt-4o-mini"];
+      const models = ["gpt-5-mini", "gpt-4.1", "gpt-4o-mini"];
       let content: string | undefined;
       let lastError: any;
       for (const model of models) {
@@ -175,7 +149,7 @@ Rules:
             ],
             temperature: 1,
           };
-          if (model.startsWith("gpt-5")) {
+          if (model.startsWith("gpt-5-mini")) {
             params.max_completion_tokens = 400;
           } else {
             params.max_tokens = 400;
@@ -226,10 +200,10 @@ Rules:
       const start = Date.now();
       console.log("🧠 [EmbeddingService] extractSkills: start", {
         needPreview: needText.substring(0, 120),
-        model: "gpt-5",
+        model: "gpt-5-mini",
       });
       const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nYou are a technical skill analyzer. Given a request for help, extract 3-15 specific technical skills that would be needed to help this person.\n\nReturn ONLY a JSON array of skill strings. Be specific and technical. Focus on concrete skills, technologies, and competencies rather than soft skills.\n\nExamples:\n- "I need help deploying my React app" → ["React.js", "deployment", "CI/CD", "web hosting"]\n- "My database queries are slow" → ["SQL optimization", "database performance", "query analysis", "indexing"]\n- "Setting up authentication" → ["authentication", "JWT", "OAuth", "security", "user management"]`;
-      const modelsSkills = ["gpt-5", "gpt-4.1", "gpt-4o-mini"];
+      const modelsSkills = ["gpt-5-mini", "gpt-4.1", "gpt-4o-mini"];
       let content: string | undefined;
       let lastSkillError: any;
       for (const model of modelsSkills) {
@@ -242,7 +216,7 @@ Rules:
             ],
             temperature: 1,
           };
-          if (model.startsWith("gpt-5")) {
+          if (model.startsWith("gpt-5-mini")) {
             params.max_completion_tokens = 500;
           } else {
             params.max_tokens = 500;

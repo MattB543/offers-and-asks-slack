@@ -538,8 +538,12 @@ const isAdmin = (userId: string): boolean => {
   return adminIds.includes(userId);
 };
 
-// Helper function to format helper results
-const formatHelperResults = (helpers: any[], needText: string) => {
+// Helper function to format helper results with AI-generated per-user summaries
+const formatHelperResults = async (
+  helpers: any[],
+  needText: string,
+  slackClient?: any
+) => {
   if (helpers.length === 0) {
     return {
       text: "I couldn't find any helpers for your specific need right now.",
@@ -558,34 +562,107 @@ const formatHelperResults = (helpers: any[], needText: string) => {
   // Build blocks for each helper
   const helperBlocks: any[] = [];
 
-  helpers.slice(0, 5).forEach((helper) => {
+  const topHelpers = helpers.slice(0, 5);
+
+  // Generate AI summaries in parallel, enriching with skills, channels, and recent messages
+  const helperContexts = await Promise.all(
+    topHelpers.map(async (helper) => {
+      try {
+        const [personRow, allSkillsRows, channels] = await Promise.all([
+          db.getPerson(helper.slack_user_id || helper.id),
+          db.getPersonSkills(helper.slack_user_id || helper.id),
+          (async () => {
+            if (!helper.slack_user_id)
+              return [] as Array<{
+                channel_name: string | null;
+                summary: string | null;
+              }>;
+            const ch = await db.getChannelsByMemberSlackIds([
+              helper.slack_user_id,
+            ]);
+            return ch.map((c) => ({
+              channel_name: c.channel_name,
+              summary: c.summary,
+            }));
+          })(),
+        ]);
+        const messages = helper.slack_user_id
+          ? await db.getUserMessages(helper.slack_user_id, 200)
+          : [];
+        const skills = (allSkillsRows || []).map((r: any) => r.skill);
+
+        // Try to fetch a small profile image via Slack API if available
+        let imageUrl: string | null = null;
+        try {
+          if (
+            slackClient &&
+            helper.slack_user_id &&
+            helper.slack_user_id.startsWith("U")
+          ) {
+            const info = await slackClient.users.info({
+              user: helper.slack_user_id,
+            });
+            const prof = (info as any).user?.profile || {};
+            imageUrl = prof.image_48 || prof.image_72 || prof.image_192 || null;
+          }
+        } catch {}
+
+        const summary = await embeddingService.generateFitSummaryForHelper({
+          needText,
+          helper: {
+            id: helper.id,
+            name: helper.name,
+            slack_user_id: helper.slack_user_id,
+            expertise: helper.expertise,
+            projects: helper.projects,
+            offers: helper.offers,
+            skills,
+            channels,
+            messages,
+            asks: personRow?.asks,
+            most_interested_in: personRow?.most_interested_in,
+            confusion: personRow?.confusion,
+          },
+        });
+        return { summary, imageUrl };
+      } catch (e) {
+        console.warn("⚠️ Failed to generate fit summary for helper", {
+          helper: helper.name,
+          error: String(e),
+        });
+        return {
+          summary: null as string | null,
+          imageUrl: null as string | null,
+        };
+      }
+    })
+  );
+
+  topHelpers.forEach((helper, idx) => {
     // Use slack_user_id for proper user mentions, fallback to name
     const userDisplay =
       helper.slack_user_id && helper.slack_user_id.startsWith("U")
         ? `<@${helper.slack_user_id}>`
         : helper.name;
+    const aiSummary = helperContexts[idx]?.summary || null;
+    const imageUrl = helperContexts[idx]?.imageUrl || null;
 
-    // Build Fellow details text
-    const fellowDetails: string[] = [];
-    if (helper.expertise) {
-      fellowDetails.push(`*Expertise:* ${helper.expertise}`);
-    }
-    if (helper.projects) {
-      fellowDetails.push(`*Projects:* ${helper.projects}`);
-    }
-    if (helper.offers) {
-      fellowDetails.push(`*Offers:* ${helper.offers}`);
-    }
-
-    // Add main section with name and Fellow details
+    // Add main section with name and AI summary
     helperBlocks.push({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*${userDisplay}*${
-          fellowDetails.length > 0 ? "\n" + fellowDetails.join("\n") : ""
-        }`,
+        text: `*${userDisplay}*${aiSummary ? "\n" + aiSummary : ""}`,
       },
+      ...(imageUrl
+        ? {
+            accessory: {
+              type: "image",
+              image_url: imageUrl,
+              alt_text: helper.name,
+            },
+          }
+        : {}),
     });
 
     // Add skills in context block if they have any
@@ -1338,7 +1415,7 @@ app.message(async ({ message, client, say }) => {
       );
 
       // Format and send results
-      const results = formatHelperResults(helpers, messageText);
+      const results = await formatHelperResults(helpers, messageText, client);
 
       // Update the thinking message with results
       await client.chat.update({
@@ -1580,7 +1657,7 @@ app.view("need_help_modal", async ({ ack, body, view, client }) => {
     const helpers = await helperMatchingService.findHelpers(needText, userId);
 
     // Format and send results directly to user (using user ID as channel)
-    const results = formatHelperResults(helpers, needText);
+    const results = await formatHelperResults(helpers, needText, client);
     await client.chat.postMessage({
       channel: userId,
       ...results,

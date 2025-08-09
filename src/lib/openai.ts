@@ -260,6 +260,97 @@ Rules:
     }
     return isConfigured;
   }
+
+  /**
+   * Generate a concise two-sentence summary explaining why a helper is a good fit for a need.
+   */
+  async generateFitSummaryForHelper(input: {
+    needText: string;
+    helper: {
+      id: string;
+      name: string;
+      slack_user_id?: string;
+      expertise?: string | null;
+      projects?: string | null;
+      offers?: string | null;
+      skills?: string[];
+      asks?: string | null;
+      most_interested_in?: string | null;
+      confusion?: string | null;
+      channels?: Array<{ channel_name: string | null; summary: string | null }>;
+      messages?: string[];
+    };
+  }): Promise<string> {
+    const { needText, helper } = input;
+    const systemPrompt =
+      "You write crisp, professional summaries for why a specific teammate is a great fit to help with a request." +
+      " Output exactly TWO sentences (no bullets). Avoid fluff; cite concrete skills, projects, offers, or channel context if relevant." +
+      " Prefer specificity over generalities. 2 sentences total, max ~60 words.";
+
+    const userPayload = {
+      request: needText,
+      person: {
+        id: helper.id,
+        name: helper.name,
+        slack_user_id: helper.slack_user_id,
+        expertise: helper.expertise || undefined,
+        projects: helper.projects || undefined,
+        offers: helper.offers || undefined,
+        asks: helper.asks || undefined,
+        most_interested_in: helper.most_interested_in || undefined,
+        confusion: helper.confusion || undefined,
+        skills: helper.skills || [],
+        channels: (helper.channels || []).map((c) => ({
+          name: c.channel_name,
+          summary: c.summary,
+        })),
+        sample_messages: (helper.messages || []).slice(-50),
+      },
+    };
+
+    const models = ["gpt-5-mini", "gpt-4o-mini"];
+    let content: string | undefined;
+    let lastError: any;
+    for (const model of models) {
+      try {
+        const params: any = {
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: JSON.stringify(userPayload) },
+          ],
+          temperature: 0.7,
+        };
+        if (model.startsWith("gpt-5-mini")) {
+          params.max_completion_tokens = 180;
+        } else {
+          params.max_tokens = 180;
+        }
+        const resp = await this.openai.chat.completions.create(params);
+        content = resp.choices[0]?.message?.content?.trim();
+        if (content) break;
+      } catch (e) {
+        lastError = e;
+        continue;
+      }
+    }
+    if (!content) {
+      throw new Error(
+        `No response from model for fit summary: ${String(
+          lastError || "unknown"
+        )}`
+      );
+    }
+
+    // Trim to two sentences if model returns extra
+    const sentences = content
+      .replace(/\s+/g, " ")
+      .split(/(?<=[.!?])\s+/)
+      .filter((s) => s && s.trim().length > 0)
+      .slice(0, 2);
+    const result = sentences.join(" ").trim();
+    return result || content;
+  }
 }
 
 export const embeddingService = new EmbeddingService();

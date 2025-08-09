@@ -395,6 +395,26 @@ export class Database {
     return result.rows;
   }
 
+  // Fetch recent plaintext messages authored by a given Slack user ID from stored exports
+  async getUserMessages(
+    slackUserId: string,
+    limit: number = 200
+  ): Promise<string[]> {
+    if (!slackUserId) return [];
+    const result = await this.query(
+      `SELECT text
+       FROM slack_message
+       WHERE user_id = $1 AND text IS NOT NULL
+       ORDER BY id DESC
+       LIMIT $2`,
+      [slackUserId, limit]
+    );
+    return result.rows
+      .map((r: any) => (r.text as string) || "")
+      .map((t: string) => t.replace(/[\s\u200B]+/g, " ").trim())
+      .filter((t: string) => t.length > 0);
+  }
+
   // Health check
   async healthCheck(): Promise<boolean> {
     try {

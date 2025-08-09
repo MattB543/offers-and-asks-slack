@@ -132,11 +132,16 @@ Rules:
         const slackToken = process.env.SLACK_BOT_TOKEN;
         if (adminId && slackToken) {
           const slack = new WebClient(slackToken);
-          const promptString = `System Prompt\n\n\`\`\`\n${systemPrompt}\n\`\`\`\n\nUser Content JSON\n\n\`\`\`json\n${JSON.stringify(
+          const promptFull = `System Prompt\n\n\`\`\`\n${systemPrompt}\n\`\`\`\n\nUser Content JSON\n\n\`\`\`json\n${JSON.stringify(
             userContent,
             null,
             2
           )}\n\`\`\``;
+          const maxLen = 2800;
+          const promptString =
+            promptFull.length > maxLen
+              ? promptFull.slice(0, maxLen) + "\n\n(truncated)"
+              : promptFull;
           await slack.chat.postMessage({
             channel: adminId,
             text: `Rerank prompt for review`,
@@ -156,18 +161,37 @@ Rules:
       } catch (dmErr) {
         console.warn("⚠️ Failed to DM rerank prompt to admin:", dmErr);
       }
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: JSON.stringify(userContent) },
-        ],
-        temperature: 1,
-        max_completion_tokens: 400,
-      });
-
-      const content = response.choices[0]?.message?.content?.trim();
-      if (!content) throw new Error("No response from GPT-4");
+      // Try primary and fallback models for robustness
+      const models = ["gpt-5", "gpt-4.1", "gpt-4o-mini"];
+      let content: string | undefined;
+      let lastError: any;
+      for (const model of models) {
+        try {
+          const params: any = {
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: JSON.stringify(userContent) },
+            ],
+            temperature: 1,
+          };
+          if (model.startsWith("gpt-5")) {
+            params.max_completion_tokens = 400;
+          } else {
+            params.max_tokens = 400;
+          }
+          const resp = await this.openai.chat.completions.create(params);
+          content = resp.choices[0]?.message?.content?.trim();
+          if (content) break;
+        } catch (e) {
+          lastError = e;
+          continue;
+        }
+      }
+      if (!content)
+        throw new Error(
+          `No response from model: ${String(lastError || "unknown")}`
+        );
 
       let parsed: any;
       try {
@@ -204,24 +228,37 @@ Rules:
         needPreview: needText.substring(0, 120),
         model: "gpt-5",
       });
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-5",
-        messages: [
-          {
-            role: "system",
-            content: `${SKILL_EXTRACTION_CONTEXT}\n\nYou are a technical skill analyzer. Given a request for help, extract 3-15 specific technical skills that would be needed to help this person.\n\nReturn ONLY a JSON array of skill strings. Be specific and technical. Focus on concrete skills, technologies, and competencies rather than soft skills.\n\nExamples:\n- "I need help deploying my React app" → ["React.js", "deployment", "CI/CD", "web hosting"]\n- "My database queries are slow" → ["SQL optimization", "database performance", "query analysis", "indexing"]\n- "Setting up authentication" → ["authentication", "JWT", "OAuth", "security", "user management"]`,
-          },
-          {
-            role: "user",
-            content: needText,
-          },
-        ],
-        temperature: 1,
-        max_completion_tokens: 500,
-      });
-
-      const content = response.choices[0]?.message?.content?.trim();
-      if (!content) throw new Error("No response from GPT-4");
+      const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nYou are a technical skill analyzer. Given a request for help, extract 3-15 specific technical skills that would be needed to help this person.\n\nReturn ONLY a JSON array of skill strings. Be specific and technical. Focus on concrete skills, technologies, and competencies rather than soft skills.\n\nExamples:\n- "I need help deploying my React app" → ["React.js", "deployment", "CI/CD", "web hosting"]\n- "My database queries are slow" → ["SQL optimization", "database performance", "query analysis", "indexing"]\n- "Setting up authentication" → ["authentication", "JWT", "OAuth", "security", "user management"]`;
+      const modelsSkills = ["gpt-5", "gpt-4.1", "gpt-4o-mini"];
+      let content: string | undefined;
+      let lastSkillError: any;
+      for (const model of modelsSkills) {
+        try {
+          const params: any = {
+            model,
+            messages: [
+              { role: "system", content: skillPrompt },
+              { role: "user", content: needText },
+            ],
+            temperature: 1,
+          };
+          if (model.startsWith("gpt-5")) {
+            params.max_completion_tokens = 500;
+          } else {
+            params.max_tokens = 500;
+          }
+          const resp = await this.openai.chat.completions.create(params);
+          content = resp.choices[0]?.message?.content?.trim();
+          if (content) break;
+        } catch (e) {
+          lastSkillError = e;
+          continue;
+        }
+      }
+      if (!content)
+        throw new Error(
+          `No response from model: ${String(lastSkillError || "unknown")}`
+        );
 
       const skills = JSON.parse(content);
       if (!Array.isArray(skills)) throw new Error("Response is not an array");

@@ -603,7 +603,14 @@ const formatHelperResults = async (
               user: helper.slack_user_id,
             });
             const prof = (info as any).user?.profile || {};
-            imageUrl = prof.image_48 || prof.image_72 || prof.image_192 || null;
+            // Prefer higher-resolution variants for sharper rendering; Slack will downscale in UI
+            imageUrl =
+              prof.image_512 ||
+              prof.image_192 ||
+              prof.image_72 ||
+              prof.image_48 ||
+              prof.image_original ||
+              null;
           }
         } catch {}
 

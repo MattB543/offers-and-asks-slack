@@ -195,6 +195,12 @@ Rules:
           }
           const resp = await this.openai.chat.completions.create(params);
           content = resp.choices[0]?.message?.content?.trim();
+          try {
+            capturePrompt?.(
+              "rerank_raw",
+              `RERANK MODEL RAW OUTPUT (model=${model})\n\n${content || ""}`
+            );
+          } catch {}
           if (content) break;
         } catch (e) {
           lastError = e;

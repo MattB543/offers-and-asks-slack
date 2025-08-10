@@ -380,16 +380,22 @@ export class HelperMatchingService {
           returnedIdsPreview: idsInOrder.slice(0, 5),
         });
 
-        // Build a map for quick lookup and return in AI order
-        const byId = new Map(topForRerank.map((h) => [h.id, h] as const));
+        // Build maps for quick lookup using both internal ids and Slack ids
+        const byInternalId = new Map(
+          topForRerank.map((h) => [h.id, h] as const)
+        );
+        const bySlackId = new Map(
+          topForRerank.map((h) => [h.slack_user_id || h.id, h] as const)
+        );
+
+        // Return in AI order, resolving ids that are Slack user ids (preferred) or internal ids
         const reRanked = idsInOrder
-          .map((id) => byId.get(id))
+          .map((id) => bySlackId.get(id) || byInternalId.get(id))
           .filter((x): x is Helper => !!x);
 
         // Fallback: if AI returned fewer than needed, top off with remaining from similarity order
-        const remaining = topForRerank.filter(
-          (h) => !idsInOrder.includes(h.id)
-        );
+        const reRankedIdsSet = new Set(reRanked.map((h) => h.id));
+        const remaining = topForRerank.filter((h) => !reRankedIdsSet.has(h.id));
         const finalList = [...reRanked, ...remaining].slice(0, limit);
         console.log("✅ [HelperMatchingService] final list prepared", {
           returned: finalList.length,

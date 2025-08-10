@@ -2,6 +2,7 @@
 // Replace the placeholder content below with the actual FLF Fellowship context
 
 export const SKILL_EXTRACTION_CONTEXT = `
+<fellowship-context>
 This request is from an FLF fellow in the following context:
 
 # Fellowship on AI for Human Reasoning
@@ -296,4 +297,5 @@ Exceptions where specialized efforts matter:
 - Systems tracking behavior and providing nudges based on pre-committed goals
 
 **Bottom Line:** AI will reshape the world. We can influence which applications come first and ensure beneficial uses aren't left behind while focusing solely on preventing harms. The opportunity is massive, timing is critical, and many more people should be working on this.
+</fellowship-context>
 `;

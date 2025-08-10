@@ -588,7 +588,7 @@ const formatHelperResults = async (
           })(),
         ]);
         const messages = helper.slack_user_id
-          ? await db.getUserMessages(helper.slack_user_id, 200)
+          ? await db.getUserMessages(helper.slack_user_id, 100)
           : [];
         const skills = (allSkillsRows || []).map((r: any) => r.skill);
 

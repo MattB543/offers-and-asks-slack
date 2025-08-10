@@ -1,6 +1,24 @@
 import OpenAI from "openai";
 import { SKILL_EXTRACTION_CONTEXT } from "./promptContext";
 
+// Channels to exclude from prompts (case-insensitive, ignores leading '#')
+const BLOCKED_CHANNEL_NAMES = new Set([
+  "announcements",
+  "demos",
+  "distribution",
+  "fellowship-water-cooler",
+  "general",
+]);
+
+const isBlockedChannelName = (name: string | null | undefined): boolean => {
+  const normalized = (name || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/^#/, "");
+  return BLOCKED_CHANNEL_NAMES.has(normalized);
+};
+
 export class EmbeddingService {
   private openai: OpenAI;
 
@@ -92,8 +110,13 @@ Rules:
 - Prefer candidates whose concrete experience clearly addresses the need
 - Treat channel summaries/memberships as meaningful evidence of topical fit; when channels clearly align with the need, weigh this alongside skills and experience
 - Break ties by higher specificity and stronger evidence in projects/offers
-- Output ONLY a JSON object with shape { "ids": ["candidate_user_id", ...] } of length ${finalCount}
+- Output ONLY a JSON object with shape { "ids": ["top_candidate_slack_user_id", ...] } of length ${finalCount}
 - Do not include any text before or after the JSON`;
+
+    const toTwoSignificantDigits = (value?: number) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Number(value.toPrecision(2))
+        : undefined;
 
     const userContent = {
       need: needText,
@@ -105,16 +128,23 @@ Rules:
         projects: c.projects || undefined,
         offers: c.offers || undefined,
         skills: c.skills,
-        matched_skills: c.matched_skills,
+        matched_skills: c.matched_skills
+          ? c.matched_skills.map((ms) => ({
+              skill: ms.skill,
+              score: toTwoSignificantDigits(ms.score),
+            }))
+          : undefined,
       })),
       final_count: finalCount,
-      channels_context: (channelsContext || []).map((ch) => ({
-        channel_id: ch.channel_id,
-        channel_name: ch.channel_name,
-        summary: ch.summary,
-        member_ids: ch.member_ids,
-        member_names: ch.member_names,
-      })),
+      channels_context: (channelsContext || [])
+        .filter((ch) => !isBlockedChannelName(ch.channel_name))
+        .map((ch) => ({
+          channel_id: ch.channel_id,
+          channel_name: ch.channel_name,
+          summary: ch.summary,
+          member_ids: ch.member_ids,
+          member_names: ch.member_names,
+        })),
     };
 
     try {
@@ -318,11 +348,13 @@ Rules:
         most_interested_in: helper.most_interested_in || undefined,
         confusion: helper.confusion || undefined,
         skills: helper.skills || [],
-        channels: (helper.channels || []).map((c) => ({
-          name: c.channel_name,
-          summary: c.summary,
-        })),
-        sample_messages: (helper.messages || []).slice(-50),
+        channels: (helper.channels || [])
+          .filter((c) => !isBlockedChannelName(c.channel_name))
+          .map((c) => ({
+            name: c.channel_name,
+            summary: c.summary,
+          })),
+        sample_messages: (helper.messages || []).slice(-100),
       },
     };
 

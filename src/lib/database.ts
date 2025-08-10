@@ -396,23 +396,100 @@ export class Database {
   }
 
   // Fetch recent plaintext messages authored by a given Slack user ID from stored exports
+  // Enhancements:
+  // - Exclude channel join notifications (subtype = 'channel_join')
+  // - Prefix each message with the channel name (e.g., "#channel_name: ...")
+  // - If a message is part of a thread, include full thread context inline
+  // - Return the most recent `limit` user-authored messages (default 100)
   async getUserMessages(
     slackUserId: string,
-    limit: number = 200
+    limit: number = 100
   ): Promise<string[]> {
     if (!slackUserId) return [];
-    const result = await this.query(
-      `SELECT text
+
+    // Step 1: Get the most recent authored messages by this user (excluding channel joins)
+    const authored = await this.query(
+      `SELECT id, channel_id, channel_name, ts, text, subtype, thread_ts, is_reply, parent_ts
        FROM slack_message
-       WHERE user_id = $1 AND text IS NOT NULL
+       WHERE user_id = $1
+         AND text IS NOT NULL
+         AND COALESCE(subtype, '') <> 'channel_join'
        ORDER BY id DESC
        LIMIT $2`,
       [slackUserId, limit]
     );
-    return result.rows
-      .map((r: any) => (r.text as string) || "")
-      .map((t: string) => t.replace(/[\s\u200B]+/g, " ").trim())
-      .filter((t: string) => t.length > 0);
+
+    const sanitize = (t: string | null | undefined): string =>
+      (t || "").replace(/[\s\u200B]+/g, " ").trim();
+
+    const formatChannel = (name: string | null | undefined): string => {
+      const n = (name || "").toString().trim();
+      if (!n) return "#unknown";
+      const withoutHash = n.replace(/^#/, "");
+      return `#${withoutHash}`;
+    };
+
+    const outputs: string[] = [];
+    for (const row of authored.rows) {
+      const channelId: string = row.channel_id;
+      const channelName: string | null = row.channel_name;
+      const thisTs: string = row.ts;
+      const rootTs: string = row.thread_ts || row.parent_ts || row.ts;
+
+      // Step 2: Load full thread context for this message's thread (root, replies)
+      let threadRows: Array<{
+        ts: string;
+        text: string | null;
+      }>; // minimal projection for formatting
+      try {
+        const threadRes = await this.query(
+          `SELECT ts, text
+           FROM slack_message
+           WHERE channel_id = $1
+             AND text IS NOT NULL
+             AND COALESCE(subtype, '') <> 'channel_join'
+             AND (
+               ts = $2 OR parent_ts = $2 OR thread_ts = $2
+             )
+           ORDER BY ts ASC, id ASC`,
+          [channelId, rootTs]
+        );
+        threadRows = threadRes.rows as Array<{ ts: string; text: string | null }>;
+      } catch {
+        // Fallback: if thread query fails, just use the single message text
+        threadRows = [{ ts: thisTs, text: row.text }];
+      }
+
+      // Step 3: Build a single-line context string
+      // Format: "#channel_name: <root> -> <reply1> -> <reply2>"
+      // If no replies, it's just "#channel_name: <text>"
+      const channelPrefix = formatChannel(channelName);
+
+      // Ensure root message is first, followed by others in order
+      let rootText = "";
+      const otherTexts: string[] = [];
+      for (const m of threadRows) {
+        const text = sanitize(m.text);
+        if (!text) continue;
+        if (m.ts === rootTs && !rootText) {
+          rootText = text;
+        } else {
+          otherTexts.push(text);
+        }
+      }
+
+      // If root not found (edge cases), fall back to this message's text
+      if (!rootText) rootText = sanitize(row.text);
+
+      const joined = otherTexts.length > 0
+        ? `${rootText} -> ${otherTexts.join(" -> ")}`
+        : rootText;
+
+      const line = `${channelPrefix}: ${joined}`.trim();
+      if (line.length > 0) outputs.push(line);
+    }
+
+    return outputs;
   }
 
   // Health check

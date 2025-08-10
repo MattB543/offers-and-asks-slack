@@ -1459,15 +1459,30 @@ app.message(async ({ message, client, say }) => {
       if (isAdmin(userId) && promptLines.length > 0) {
         try {
           const report = promptLines.join("\n");
-          await client.files.upload({
-            channels: userId,
-            content: report,
-            filetype: "text",
-            filename: `llm-prompts-${Date.now()}.txt`,
-            title: "LLM Prompts Report",
+          // Prefer modern upload flow: files.getUploadURLExternal + completeUploadExternal
+          const filename = `llm-prompts-${Date.now()}.txt`;
+          const getUrl = await client.files.getUploadURLExternal({
+            filename,
+            length: Buffer.byteLength(report, "utf8"),
+          } as any);
+          const uploadUrl = (getUrl as any).upload_url as string;
+          const fileId = (getUrl as any).file_id as string;
+          await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: Buffer.from(report, "utf8"),
+          } as any);
+          await client.files.completeUploadExternal({
+            files: [
+              {
+                id: fileId,
+                title: "LLM Prompts Report",
+              },
+            ],
+            channel_id: (channel as string) || userId,
             initial_comment:
               "Here are the prompts used (skills, rerank, fit summaries).",
-          });
+          } as any);
         } catch (e) {
           console.warn("⚠️ Failed to upload prompt report:", e);
         }
@@ -1729,15 +1744,29 @@ app.view("need_help_modal", async ({ ack, body, view, client }) => {
     if (isAdmin(userId) && promptLines.length > 0) {
       try {
         const report = promptLines.join("\n");
-        await client.files.upload({
-          channels: userId,
-          content: report,
-          filetype: "text",
-          filename: `llm-prompts-${Date.now()}.txt`,
-          title: "LLM Prompts Report",
+        const filename = `llm-prompts-${Date.now()}.txt`;
+        const getUrl = await client.files.getUploadURLExternal({
+          filename,
+          length: Buffer.byteLength(report, "utf8"),
+        } as any);
+        const uploadUrl = (getUrl as any).upload_url as string;
+        const fileId = (getUrl as any).file_id as string;
+        await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: Buffer.from(report, "utf8"),
+        } as any);
+        await client.files.completeUploadExternal({
+          files: [
+            {
+              id: fileId,
+              title: "LLM Prompts Report",
+            },
+          ],
+          channel_id: userId,
           initial_comment:
             "Here are the prompts used (skills, rerank, fit summaries).",
-        });
+        } as any);
       } catch (e) {
         console.warn("⚠️ Failed to upload prompt report:", e);
       }

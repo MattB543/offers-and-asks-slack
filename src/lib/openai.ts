@@ -16,7 +16,10 @@ const isBlockedChannelName = (name: string | null | undefined): boolean => {
     .trim()
     .toLowerCase()
     .replace(/^#/, "");
-  return BLOCKED_CHANNEL_NAMES.has(normalized);
+  if (BLOCKED_CHANNEL_NAMES.has(normalized)) return true;
+  if (normalized.includes("lab-notes")) return true;
+  if (normalized.includes("surface-area")) return true;
+  return false;
 };
 
 export class EmbeddingService {
@@ -100,6 +103,8 @@ export class EmbeddingService {
     capturePrompt?: (type: string, content: string) => void
   ): Promise<string[]> {
     const systemPrompt = `You are an expert recruiter helping to match a person's request with the best teammates to help.
+Re-order candidates so the most relevant candidates are first.
+
 Re-rank candidates based on:
 1) Direct skill relevance to the need
 2) Demonstrated expertise/projects/offers relevance
@@ -107,9 +112,9 @@ Re-rank candidates based on:
 4) Relevance of Slack channel participation to the need (use channels context below)
 
 Rules:
-- Prefer candidates whose concrete experience clearly addresses the need
-- Treat channel summaries/memberships as meaningful evidence of topical fit; when channels clearly align with the need, weigh this alongside skills and experience
-- Break ties by higher specificity and stronger evidence in projects/offers
+- Prefer candidates whose concrete experience most clearly addresses the need
+- Treat channel summaries/memberships as evidence of topical fit; when channels clearly align with the need, weigh this alongside skills and experience
+- Break ties by higher specificity and stronger evidence
 - Output ONLY a JSON object with shape { "ids": ["top_candidate_slack_user_id", ...] } of length ${finalCount}
 - Do not include any text before or after the JSON`;
 

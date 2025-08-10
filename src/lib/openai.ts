@@ -112,8 +112,9 @@ Re-rank candidates based on:
 4) Relevance of Slack channel participation to the need (use channels context below)
 
 Rules:
+- The strongest signal is 'expertise', 'offers', and 'projects', but consider all data supplied
 - Prefer candidates whose concrete experience most clearly addresses the need
-- Treat channel summaries/memberships as evidence of topical fit; when channels clearly align with the need, weigh this alongside skills and experience
+- Treat Slack messages and channels as auxiliary data, not primary evidence
 - Break ties by higher specificity and stronger evidence
 - Output ONLY a JSON object with shape { "ids": ["top_candidate_slack_user_id", ...] } of length ${finalCount}
 - Do not include any text before or after the JSON`;
@@ -174,42 +175,25 @@ Rules:
       try {
         capturePrompt?.("rerank", `RERANK PROMPT\n\n${promptFull}`);
       } catch {}
-      // Try primary and fallback models for robustness
-      const models = ["gpt-5-mini", "gpt-4.1", "gpt-4o-mini"];
-      let content: string | undefined;
-      let lastError: any;
-      for (const model of models) {
-        try {
-          const params: any = {
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: JSON.stringify(userContent) },
-            ],
-            temperature: 1,
-          };
-          if (model.startsWith("gpt-5-mini")) {
-            params.max_completion_tokens = 400;
-          } else {
-            params.max_tokens = 400;
-          }
-          const resp = await this.openai.chat.completions.create(params);
-          content = resp.choices[0]?.message?.content?.trim();
-          try {
-            capturePrompt?.(
-              "rerank_raw",
-              `RERANK MODEL RAW OUTPUT (model=${model})\n\n${content || ""}`
-            );
-          } catch {}
-          if (content) break;
-        } catch (e) {
-          lastError = e;
-          continue;
-        }
-      }
+      // Use Responses API with gpt-5-mini
+      const resp = await this.openai.responses.create({
+        model: "gpt-5-mini",
+        input: `System Prompt\n\n${systemPrompt}\n\nUser Content JSON\n\n${JSON.stringify(
+          userContent
+        )}`,
+        temperature: 1,
+        max_output_tokens: 10000,
+      });
+      const content = (resp as any).output_text?.trim() as string | undefined;
+      try {
+        capturePrompt?.(
+          "rerank_raw",
+          `RERANK MODEL RAW OUTPUT (model=gpt-5-mini)\n\n${content || ""}`
+        );
+      } catch {}
       if (!content)
         throw new Error(
-          `No response from model: ${String(lastError || "unknown")}`
+          "No response text returned by gpt-5-mini (empty output)"
         );
 
       let parsed: any;
@@ -251,35 +235,16 @@ Rules:
         model: "gpt-5-mini",
       });
       const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nYou are a technical skill analyzer. Given a request for help, extract 3-15 specific technical skills that would be needed to help this person.\n\nReturn ONLY a JSON array of skill strings. Be specific and technical. Focus on concrete skills, technologies, and competencies rather than soft skills.\n\nExamples:\n- "I need help deploying my React app" → ["React.js", "deployment", "CI/CD", "web hosting"]\n- "My database queries are slow" → ["SQL optimization", "database performance", "query analysis", "indexing"]\n- "Setting up authentication" → ["authentication", "JWT", "OAuth", "security", "user management"]`;
-      const modelsSkills = ["gpt-5-mini", "gpt-4.1", "gpt-4o-mini"];
-      let content: string | undefined;
-      let lastSkillError: any;
-      for (const model of modelsSkills) {
-        try {
-          const params: any = {
-            model,
-            messages: [
-              { role: "system", content: skillPrompt },
-              { role: "user", content: needText },
-            ],
-            temperature: 1,
-          };
-          if (model.startsWith("gpt-5-mini")) {
-            params.max_completion_tokens = 500;
-          } else {
-            params.max_tokens = 500;
-          }
-          const resp = await this.openai.chat.completions.create(params);
-          content = resp.choices[0]?.message?.content?.trim();
-          if (content) break;
-        } catch (e) {
-          lastSkillError = e;
-          continue;
-        }
-      }
+      const resp = await this.openai.responses.create({
+        model: "gpt-5-mini",
+        input: `System Prompt\n\n${skillPrompt}\n\nUser Input\n\n${needText}`,
+        temperature: 1,
+        max_output_tokens: 10000,
+      });
+      const content = (resp as any).output_text?.trim() as string | undefined;
       if (!content)
         throw new Error(
-          `No response from model: ${String(lastSkillError || "unknown")}`
+          "No response text returned by gpt-5-mini (empty output)"
         );
 
       try {
@@ -343,7 +308,7 @@ Rules:
       " Output exactly THREE bullet points as incomplete sentences, each starting with '- '." +
       " Do not include their name, pronouns, or @mentions (the name is shown elsewhere)." +
       " Use only information provided in the request and person fields; do not invent details." +
-      " Prioritize concrete evidence: directly relevant skills/experience, notable projects or offers, and relevant Slack channels (format as #channel_name) or recent message themes." +
+      " Prioritize concrete evidence: directly relevant skills/experience, notable projects or offers, or recent message themes." +
       " Prefer short 'why-they-fit' phrasing over raw skill lists. No fluff. Keep each bullet ~8–16 words. Output only the three bullets (no intro/outro).";
 
     const userPayload = {
@@ -369,38 +334,17 @@ Rules:
       },
     };
 
-    const models = ["gpt-5-mini", "gpt-4o-mini"];
-    let content: string | undefined;
-    let lastError: any;
-    for (const model of models) {
-      try {
-        const params: any = {
-          model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: JSON.stringify(userPayload) },
-          ],
-          temperature: 0.7,
-        };
-        if (model.startsWith("gpt-5-mini")) {
-          params.max_completion_tokens = 180;
-        } else {
-          params.max_tokens = 180;
-        }
-        const resp = await this.openai.chat.completions.create(params);
-        content = resp.choices[0]?.message?.content?.trim();
-        if (content) break;
-      } catch (e) {
-        lastError = e;
-        continue;
-      }
-    }
+    const resp = await this.openai.responses.create({
+      model: "gpt-5-mini",
+      input: `System Prompt\n\n${systemPrompt}\n\nUser Payload\n\n${JSON.stringify(
+        userPayload
+      )}`,
+      temperature: 1,
+      max_output_tokens: 10000,
+    });
+    const content = (resp as any).output_text?.trim() as string | undefined;
     if (!content) {
-      throw new Error(
-        `No response from model for fit summary: ${String(
-          lastError || "unknown"
-        )}`
-      );
+      throw new Error("No response text returned by gpt-5-mini (empty output)");
     }
 
     // Normalize to exactly three hyphen bullets, incomplete sentences if possible
@@ -517,38 +461,17 @@ export class ChannelSummarizerService {
 
     const userPrompt = `Here are representative recent messages from a Slack channel. Write a concise summary in 1 to 5 sentences.\n\nMessages:\n- ${joined}`;
 
-    const response = await this.openai.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_completion_tokens: 250,
+    const response = await this.openai.responses.create({
+      model: "gpt-5-mini",
+      input: `System Prompt\n\n${systemPrompt}\n\nUser Prompt\n\n${userPrompt}`,
+      temperature: 1,
+      max_output_tokens: 10000,
     });
-    let content = response.choices[0]?.message?.content?.trim() || "";
-    if (!content || content.length < 10) {
-      // Fallback to a more permissive/completions-friendly model if result is empty
-      const fallbackModel = "gpt-5-mini";
-      const fallback = await this.openai.chat.completions.create({
-        model: fallbackModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 1,
-        max_completion_tokens: 250,
-      });
-      content = fallback.choices[0]?.message?.content?.trim() || "";
-      const summary = content
-        .split("\n")
-        .filter((l) => l.trim().length > 0)
-        .join(" ");
-      return { summary, model: content ? fallbackModel : model };
-    }
+    const content = (response as any).output_text?.trim() || "";
 
     const summary = content
       .split("\n")
-      .filter((l) => l.trim().length > 0)
+      .filter((line: string) => line.trim().length > 0)
       .join(" ");
     return { summary, model };
   }

@@ -356,6 +356,40 @@ export class HelperMatchingService {
           );
         }
 
+        // Fetch recent authored messages for each candidate to include as auxiliary context
+        const idToMessages = new Map<string, string[]>();
+        try {
+          const messageFetchResults = await Promise.all(
+            topForRerank.map(async (h) => {
+              const key = h.id;
+              const slackId = h.slack_user_id || h.id;
+              try {
+                const msgs = await db.getUserMessages(slackId, 100);
+                return { id: key, messages: msgs };
+              } catch (err) {
+                console.warn("⚠️ Failed to fetch messages for candidate", {
+                  id: key,
+                  slackId,
+                  err,
+                });
+                return { id: key, messages: [] as string[] };
+              }
+            })
+          );
+          for (const item of messageFetchResults) {
+            idToMessages.set(item.id, item.messages);
+          }
+          console.log(
+            "📚 [HelperMatchingService] fetched recent messages for candidates",
+            { count: idToMessages.size }
+          );
+        } catch (e) {
+          console.warn(
+            "⚠️ Failed to load candidate messages for rerank; proceeding without them",
+            e
+          );
+        }
+
         const idsInOrder = await embeddingService.rerankCandidates(
           needText,
           topForRerank.map((h) => ({
@@ -366,6 +400,7 @@ export class HelperMatchingService {
             projects: h.projects,
             offers: h.offers,
             skills: idToAllSkills.get(h.id) || h.skills.map((s) => s.skill),
+            messages: idToMessages.get(h.id) || [],
             matched_skills: h.skills.map((s) => ({
               skill: s.skill,
               score: s.score,

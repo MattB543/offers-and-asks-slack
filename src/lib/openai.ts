@@ -90,6 +90,7 @@ export class EmbeddingService {
       projects?: string | null;
       offers?: string | null;
       skills: string[];
+      messages?: string[];
       matched_skills?: Array<{ skill: string; score?: number }>;
     }>,
     finalCount: number = 5,
@@ -134,6 +135,7 @@ Rules:
         projects: c.projects || undefined,
         offers: c.offers || undefined,
         skills: c.skills,
+        sample_messages: (c.messages || []).slice(-100),
         matched_skills: c.matched_skills
           ? c.matched_skills.map((ms) => ({
               skill: ms.skill,

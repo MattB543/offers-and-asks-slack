@@ -21,7 +21,8 @@ export class HelperMatchingService {
   async findHelpers(
     needText: string,
     requesterId?: string,
-    limit: number = 5
+    limit: number = 5,
+    capturePrompt?: (type: string, content: string) => void
   ): Promise<Helper[]> {
     let needId: number | null = null;
     try {
@@ -34,7 +35,10 @@ export class HelperMatchingService {
 
       // Extract specific skills needed using GPT-4
       const skillExtractStart = Date.now();
-      const extractedSkills = await embeddingService.extractSkills(needText);
+      const extractedSkills = await embeddingService.extractSkills(
+        needText,
+        capturePrompt
+      );
       console.log("🎯 [HelperMatchingService] extracted skills", {
         count: extractedSkills.length,
         sample: extractedSkills.slice(0, 10),
@@ -313,6 +317,38 @@ export class HelperMatchingService {
           channelsContext = await db.getChannelsByMemberSlackIds(
             candidateSlackIds
           );
+          // Filter channels and members to only those relevant to the 10 candidates, and drop noisy channels
+          const candidateIdSet = new Set(candidateSlackIds);
+          const slackIdToName = new Map(
+            topForRerank
+              .map((h) => [h.slack_user_id, h.name] as const)
+              .filter(([id]) => !!id)
+          );
+          channelsContext = channelsContext
+            .filter((ch) => {
+              const title = (ch.channel_name || "").toLowerCase();
+              if (
+                title.includes("lab-notes") ||
+                title.includes("surface-area")
+              ) {
+                return false;
+              }
+              return true;
+            })
+            .map((ch) => {
+              const filteredMemberIds = (ch.member_ids || []).filter((id) =>
+                candidateIdSet.has(id)
+              );
+              const filteredMemberNames = filteredMemberIds.map(
+                (id) => slackIdToName.get(id) || id
+              );
+              return {
+                ...ch,
+                member_ids: filteredMemberIds,
+                member_names: filteredMemberNames,
+              };
+            })
+            .filter((ch) => ch.member_ids.length > 0);
         } catch (e) {
           console.warn(
             "⚠️ Failed to load channels context for rerank; proceeding without it",
@@ -336,7 +372,8 @@ export class HelperMatchingService {
             })),
           })),
           limit,
-          channelsContext
+          channelsContext,
+          capturePrompt
         );
         console.log("🏁 [HelperMatchingService] re-rank complete", {
           returned: idsInOrder.length,

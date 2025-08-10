@@ -542,7 +542,8 @@ const isAdmin = (userId: string): boolean => {
 const formatHelperResults = async (
   helpers: any[],
   needText: string,
-  slackClient?: any
+  slackClient?: any,
+  capturePrompt?: (type: string, content: string) => void
 ) => {
   if (helpers.length === 0) {
     return {
@@ -630,6 +631,7 @@ const formatHelperResults = async (
             most_interested_in: personRow?.most_interested_in,
             confusion: personRow?.confusion,
           },
+          capturePrompt,
         });
         return { summary, imageUrl };
       } catch (e) {
@@ -1415,14 +1417,30 @@ app.message(async ({ message, client, say }) => {
     });
 
     try {
+      // If admin, capture all prompts and send a .txt report back
+      const promptLines: string[] = [];
+      const capturePrompt = (type: string, content: string) => {
+        const ts = new Date().toISOString();
+        promptLines.push(
+          `===== ${type.toUpperCase()} @ ${ts} =====\n${content}\n\n`
+        );
+      };
+
       // Find helpers for this need
       const helpers = await helperMatchingService.findHelpers(
         messageText,
-        userId
+        userId,
+        undefined,
+        isAdmin(userId) ? capturePrompt : undefined
       );
 
       // Format and send results
-      const results = await formatHelperResults(helpers, messageText, client);
+      const results = await formatHelperResults(
+        helpers,
+        messageText,
+        client,
+        isAdmin(userId) ? capturePrompt : undefined
+      );
 
       // Update the thinking message with results
       await client.chat.update({
@@ -1436,6 +1454,24 @@ app.message(async ({ message, client, say }) => {
         helpersReturned: helpers.length,
         topHelperNames: helpers.slice(0, 3).map((h) => h.name),
       });
+
+      // If admin, send prompts as a .txt attachment for review
+      if (isAdmin(userId) && promptLines.length > 0) {
+        try {
+          const report = promptLines.join("\n");
+          await client.files.upload({
+            channels: userId,
+            content: report,
+            filetype: "text",
+            filename: `llm-prompts-${Date.now()}.txt`,
+            title: "LLM Prompts Report",
+            initial_comment:
+              "Here are the prompts used (skills, rerank, fit summaries).",
+          });
+        } catch (e) {
+          console.warn("⚠️ Failed to upload prompt report:", e);
+        }
+      }
 
       // Weekly need is stored within HelperMatchingService to avoid duplication
     } catch (error) {
@@ -1660,15 +1696,52 @@ app.view("need_help_modal", async ({ ack, body, view, client }) => {
       return;
     }
 
+    // If admin, capture all prompts and send a .txt report back
+    const promptLines: string[] = [];
+    const capturePrompt = (type: string, content: string) => {
+      const ts = new Date().toISOString();
+      promptLines.push(
+        `===== ${type.toUpperCase()} @ ${ts} =====\n${content}\n\n`
+      );
+    };
+
     // Find helpers for this need
-    const helpers = await helperMatchingService.findHelpers(needText, userId);
+    const helpers = await helperMatchingService.findHelpers(
+      needText,
+      userId,
+      undefined,
+      isAdmin(userId) ? capturePrompt : undefined
+    );
 
     // Format and send results directly to user (using user ID as channel)
-    const results = await formatHelperResults(helpers, needText, client);
+    const results = await formatHelperResults(
+      helpers,
+      needText,
+      client,
+      isAdmin(userId) ? capturePrompt : undefined
+    );
     await client.chat.postMessage({
       channel: userId,
       ...results,
     });
+
+    // If admin, upload the prompts as a .txt file
+    if (isAdmin(userId) && promptLines.length > 0) {
+      try {
+        const report = promptLines.join("\n");
+        await client.files.upload({
+          channels: userId,
+          content: report,
+          filetype: "text",
+          filename: `llm-prompts-${Date.now()}.txt`,
+          title: "LLM Prompts Report",
+          initial_comment:
+            "Here are the prompts used (skills, rerank, fit summaries).",
+        });
+      } catch (e) {
+        console.warn("⚠️ Failed to upload prompt report:", e);
+      }
+    }
   } catch (error) {
     await errorHandler.handle(error, "need_help_modal", {
       userId: body.user.id,

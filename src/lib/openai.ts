@@ -78,7 +78,8 @@ export class EmbeddingService {
       summary: string | null;
       member_ids: string[];
       member_names: string[];
-    }>
+    }>,
+    capturePrompt?: (type: string, content: string) => void
   ): Promise<string[]> {
     const systemPrompt = `You are an expert recruiter helping to match a person's request with the best teammates to help.
 Re-rank candidates based on:
@@ -135,6 +136,9 @@ Rules:
         "🧪 [EmbeddingService] rerankCandidates prompt (full)",
         promptFull
       );
+      try {
+        capturePrompt?.("rerank", `RERANK PROMPT\n\n${promptFull}`);
+      } catch {}
       // Try primary and fallback models for robustness
       const models = ["gpt-5-mini", "gpt-4.1", "gpt-4o-mini"];
       let content: string | undefined;
@@ -195,7 +199,10 @@ Rules:
     }
   }
 
-  async extractSkills(needText: string): Promise<string[]> {
+  async extractSkills(
+    needText: string,
+    capturePrompt?: (type: string, content: string) => void
+  ): Promise<string[]> {
     try {
       const start = Date.now();
       console.log("🧠 [EmbeddingService] extractSkills: start", {
@@ -233,6 +240,13 @@ Rules:
         throw new Error(
           `No response from model: ${String(lastSkillError || "unknown")}`
         );
+
+      try {
+        capturePrompt?.(
+          "skills",
+          `SKILL EXTRACTION\n\nSystem Prompt\n\n${skillPrompt}\n\nUser Input\n\n${needText}\n\nModel Raw Output\n\n${content}`
+        );
+      } catch {}
 
       const skills = JSON.parse(content);
       if (!Array.isArray(skills)) throw new Error("Response is not an array");
@@ -280,6 +294,7 @@ Rules:
       channels?: Array<{ channel_name: string | null; summary: string | null }>;
       messages?: string[];
     };
+    capturePrompt?: (type: string, content: string) => void;
   }): Promise<string> {
     const { needText, helper } = input;
     const systemPrompt =
@@ -417,6 +432,17 @@ Rules:
       while (bullets.length < 3) bullets.push("- ");
       return bullets.join("\n");
     };
+
+    try {
+      input.capturePrompt?.(
+        "fit_summary",
+        `FIT SUMMARY\n\nSystem Prompt\n\n${systemPrompt}\n\nUser Payload\n\n${JSON.stringify(
+          userPayload,
+          null,
+          2
+        )}\n\nModel Raw Output\n\n${content}`
+      );
+    } catch {}
 
     const result = normalizeToBullets(content).trim();
     return result || content;

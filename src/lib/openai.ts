@@ -607,7 +607,7 @@ export class ChannelSummarizerService {
       "Some messages may be irrelevant; ignore anything that does not help summarize the topic.",
       "Goal: produce simple, concise, readable bullets broken down by individual points/updates/findings.",
       "Prefer clear, scannable phrasing. Avoid fluff. Group related points if helpful.",
-      "Output only markdown text (a bulleted list and optional sub-bullets). No code fences. No extra commentary.",
+      "Output only markdown text (bold text, a bulleted list, and optional sub-bullets). No code fences. No extra commentary.",
     ].join(" ");
 
     const userPayload = {
@@ -639,7 +639,7 @@ export class ChannelSummarizerService {
     capturePrompt?.("user", JSON.stringify(userPayload, null, 2));
 
     const response = await this.openai.responses.create({
-      model: "gpt-5-mini",
+      model: "gpt-5",
       reasoning: { effort: "low" },
       input: composed,
       temperature: 1,

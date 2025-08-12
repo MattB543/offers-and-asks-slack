@@ -106,6 +106,8 @@ CREATE TABLE IF NOT EXISTS slack_message (
   thread_ts TEXT,
   is_reply BOOLEAN NOT NULL DEFAULT FALSE,
   parent_ts TEXT,
+  -- Per-message embedding for semantic search
+  embedding vector(1536),
   raw JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -127,10 +129,18 @@ CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(active);
 CREATE INDEX IF NOT EXISTS idx_tenants_installed_at ON tenants(installed_at);
 CREATE INDEX IF NOT EXISTS idx_tenants_team_id ON tenants(team_id);
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_team ON tenants(team_id);
+CREATE INDEX IF NOT EXISTS idx_slack_message_channel_export ON slack_message(channel_export_id);
+CREATE INDEX IF NOT EXISTS idx_slack_message_thread_ts ON slack_message(thread_ts);
+CREATE UNIQUE INDEX IF NOT EXISTS slack_message_unique ON slack_message(channel_id, ts);
+CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(active);
+CREATE INDEX IF NOT EXISTS idx_tenants_installed_at ON tenants(installed_at);
+CREATE INDEX IF NOT EXISTS idx_tenants_team_id ON tenants(team_id);
+CREATE UNIQUE INDEX IF NOT EXISTS unique_active_team ON tenants(team_id);
 
 -- Create HNSW index for vector similarity search (comment out if not needed initially)
 -- CREATE INDEX IF NOT EXISTS idx_skills_embedding_hnsw ON skills USING hnsw (embedding vector_cosine_ops);
 -- CREATE INDEX IF NOT EXISTS idx_needs_embedding_hnsw ON weekly_needs USING hnsw (need_embedding vector_cosine_ops);
+-- CREATE INDEX IF NOT EXISTS idx_slack_message_embedding_hnsw ON slack_message USING hnsw (embedding vector_cosine_ops);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

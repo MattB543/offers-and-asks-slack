@@ -65,12 +65,10 @@ export class EmbeddingService {
   async generateMultipleEmbeddings(texts: string[]): Promise<number[][]> {
     try {
       const start = Date.now();
-      // Normalize inputs: trim whitespace, drop empties, and deduplicate
-      const normalized = Array.from(
-        new Set(
-          (texts || []).map((t) => (t ?? "").trim()).filter((t) => t.length > 0)
-        )
-      );
+      // Normalize inputs: trim whitespace and drop empties (preserve order; no dedupe)
+      const normalized = (texts || [])
+        .map((t) => (t ?? "").trim())
+        .filter((t) => t.length > 0);
       console.log("🧠 [EmbeddingService] generateMultipleEmbeddings: start", {
         count: (texts || []).length,
         filtered: normalized.length,

@@ -120,6 +120,63 @@ export class Database {
     await this.pool.end();
   }
 
+  // ============ Slack message embeddings ============
+  async upsertSlackMessageEmbedding(
+    messageId: number,
+    embedding: number[]
+  ): Promise<void> {
+    await this.query(
+      `UPDATE slack_message SET embedding = $1::vector WHERE id = $2`,
+      [`[${embedding.join(",")}]`, messageId]
+    );
+  }
+
+  async batchUpdateSlackMessageEmbeddings(
+    pairs: Array<{ id: number; embedding: number[] }>
+  ): Promise<void> {
+    if (pairs.length === 0) return;
+    // Filter out empty vectors to avoid pgvector errors
+    const valid = pairs.filter(
+      (p) => Array.isArray(p.embedding) && p.embedding.length > 0
+    );
+    if (valid.length === 0) return;
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const { id, embedding } of valid) {
+        await client.query(
+          `UPDATE slack_message SET embedding = $1::vector WHERE id = $2`,
+          [`[${embedding.join(",")}]`, id]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {}
+      throw e;
+    } finally {
+      client.release();
+    }
+  }
+
+  async fetchSlackMessagesNeedingEmbedding(
+    limit: number
+  ): Promise<Array<{ id: number; text: string }>> {
+    const res = await this.query(
+      `SELECT id, text
+       FROM slack_message
+       WHERE text IS NOT NULL
+         AND COALESCE(subtype,'') <> 'channel_join'
+         AND text ~ '\\S'
+         AND embedding IS NULL
+       ORDER BY id ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return res.rows as Array<{ id: number; text: string }>;
+  }
+
   // Person management methods
   async createPerson(userId: string, displayName: string): Promise<void> {
     try {

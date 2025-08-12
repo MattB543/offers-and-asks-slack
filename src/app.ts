@@ -2,7 +2,7 @@ import { App, ExpressReceiver } from "@slack/bolt";
 import express from "express";
 import { config } from "dotenv";
 import { db } from "./lib/database";
-import { embeddingService } from "./lib/openai";
+import { embeddingService, channelSummarizerService } from "./lib/openai";
 import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
 import { sendWeeklyPrompts } from "./jobs/weekly-prompt";
@@ -192,76 +192,84 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         | undefined;
       if (isSlackExportShape) {
         try {
-          const { exportId } = await db.runInTransaction(async (client) => {
-            // 1) Top-level export record
-            const exportInsert = await client.query(
-              `INSERT INTO slack_export (collection_time, raw) VALUES ($1, $2::jsonb) RETURNING id`,
-              [payload.collection_time || null, JSON.stringify(payload)]
-            );
-            const exportId: number = exportInsert.rows[0].id;
+          const { exportId, insertedMessages, summary } =
+            await db.runInTransaction(async (client) => {
+              // 1) Top-level export record
+              const exportInsert = await client.query(
+                `INSERT INTO slack_export (collection_time, raw) VALUES ($1, $2::jsonb) RETURNING id`,
+                [payload.collection_time || null, JSON.stringify(payload)]
+              );
+              const exportId: number = exportInsert.rows[0].id;
 
-            // 2) Channel metadata and 3) messages
-            const channels: Record<string, any> = payload.channels;
-            let channelsProcessed = 0;
-            let messagesInserted = 0;
-            let repliesInserted = 0;
-            let duplicatesSkipped = 0;
-            let channelsWithMissingId = 0;
-            for (const [channelName, channelData] of Object.entries(channels)) {
-              const channelId: string | null = channelData?.id || null;
-              const messageCount: number | null =
-                channelData?.message_count ?? null;
-              const threadRepliesCount: number | null =
-                channelData?.thread_replies_count ?? null;
+              // 2) Channel metadata and 3) messages
+              const channels: Record<string, any> = payload.channels;
+              let channelsProcessed = 0;
+              let messagesInserted = 0;
+              let repliesInserted = 0;
+              let duplicatesSkipped = 0;
+              let channelsWithMissingId = 0;
+              const insertedForEmbedding: Array<{
+                id: number;
+                text: string | null;
+                subtype: string | null;
+              }> = [];
+              for (const [channelName, channelData] of Object.entries(
+                channels
+              )) {
+                const channelId: string | null = channelData?.id || null;
+                const messageCount: number | null =
+                  channelData?.message_count ?? null;
+                const threadRepliesCount: number | null =
+                  channelData?.thread_replies_count ?? null;
 
-              const channelInsert = await client.query(
-                `INSERT INTO slack_channel_export (export_id, channel_id, channel_name, message_count, thread_replies_count)
+                const channelInsert = await client.query(
+                  `INSERT INTO slack_channel_export (export_id, channel_id, channel_name, message_count, thread_replies_count)
                  VALUES ($1, $2, $3, $4, $5)
                  ON CONFLICT (export_id, channel_id) DO UPDATE SET
                    channel_name = EXCLUDED.channel_name,
                    message_count = EXCLUDED.message_count,
                    thread_replies_count = EXCLUDED.thread_replies_count
                  RETURNING id`,
-                [
-                  exportId,
-                  channelId,
-                  channelName,
-                  messageCount,
-                  threadRepliesCount,
-                ]
-              );
-              const channelExportId: number = channelInsert.rows[0].id;
-              channelsProcessed += 1;
+                  [
+                    exportId,
+                    channelId,
+                    channelName,
+                    messageCount,
+                    threadRepliesCount,
+                  ]
+                );
+                const channelExportId: number = channelInsert.rows[0].id;
+                channelsProcessed += 1;
 
-              const messages: any[] = Array.isArray(channelData?.messages)
-                ? channelData.messages
-                : [];
+                const messages: any[] = Array.isArray(channelData?.messages)
+                  ? channelData.messages
+                  : [];
 
-              if (!channelId) {
-                channelsWithMissingId += 1;
-                if (messages.length > 0) {
-                  console.warn(
-                    `⚠️ Skipping message inserts for channel "${channelName}" because channel_id is missing`
-                  );
-                }
-              }
-
-              const insertMessage = async (
-                msg: any,
-                isReply: boolean,
-                parentTs: string | null
-              ) => {
-                const ts: string = String(msg.timestamp);
-                const userId: string | null = msg.user ?? null;
-                const text: string | null = msg.text ?? null;
-                const messageType: string | null = msg.type ?? null;
-                const subtype: string | null = msg.subtype ?? null;
-                const threadTs: string | null = msg.thread_ts ?? null;
                 if (!channelId) {
-                  return false;
+                  channelsWithMissingId += 1;
+                  if (messages.length > 0) {
+                    console.warn(
+                      `⚠️ Skipping message inserts for channel "${channelName}" because channel_id is missing`
+                    );
+                  }
                 }
-                const result = await client.query(
-                  `INSERT INTO slack_message (
+
+                const insertMessage = async (
+                  msg: any,
+                  isReply: boolean,
+                  parentTs: string | null
+                ) => {
+                  const ts: string = String(msg.timestamp);
+                  const userId: string | null = msg.user ?? null;
+                  const text: string | null = msg.text ?? null;
+                  const messageType: string | null = msg.type ?? null;
+                  const subtype: string | null = msg.subtype ?? null;
+                  const threadTs: string | null = msg.thread_ts ?? null;
+                  if (!channelId) {
+                    return false;
+                  }
+                  const result = await client.query(
+                    `INSERT INTO slack_message (
                     export_id,
                     channel_export_id,
                     channel_id,
@@ -277,61 +285,113 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     raw
                   ) VALUES (
                     $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb
-                  ) ON CONFLICT (channel_id, ts) DO NOTHING`,
-                  [
-                    exportId,
-                    channelExportId,
-                    channelId,
-                    channelName,
-                    ts,
-                    userId,
-                    text,
-                    messageType,
-                    subtype,
-                    threadTs,
-                    isReply,
-                    parentTs,
-                    JSON.stringify(msg),
-                  ]
-                );
-                return result.rowCount === 1;
-              };
-
-              for (const msg of messages) {
-                const inserted = await insertMessage(msg, false, null);
-                if (inserted) {
-                  messagesInserted += 1;
-                } else {
-                  duplicatesSkipped += 1; // either duplicate or missing channel id
-                }
-                const replies: any[] = Array.isArray(msg.replies)
-                  ? msg.replies
-                  : [];
-                for (const reply of replies) {
-                  const rInserted = await insertMessage(
-                    reply,
-                    true,
-                    String(msg.timestamp)
+                  ) ON CONFLICT (channel_id, ts) DO NOTHING RETURNING id, text, subtype`,
+                    [
+                      exportId,
+                      channelExportId,
+                      channelId,
+                      channelName,
+                      ts,
+                      userId,
+                      text,
+                      messageType,
+                      subtype,
+                      threadTs,
+                      isReply,
+                      parentTs,
+                      JSON.stringify(msg),
+                    ]
                   );
-                  if (rInserted) {
-                    repliesInserted += 1;
+                  const inserted = result.rowCount === 1;
+                  if (inserted) {
+                    const row = result.rows[0] as {
+                      id: number;
+                      text: string | null;
+                      subtype: string | null;
+                    };
+                    // Only embed meaningful texts and exclude channel join
+                    if (
+                      row &&
+                      row.text &&
+                      (row.subtype ?? "") !== "channel_join"
+                    ) {
+                      insertedForEmbedding.push(row);
+                    }
+                  }
+                  return inserted;
+                };
+
+                for (const msg of messages) {
+                  const inserted = await insertMessage(msg, false, null);
+                  if (inserted) {
+                    messagesInserted += 1;
                   } else {
-                    duplicatesSkipped += 1;
+                    duplicatesSkipped += 1; // either duplicate or missing channel id
+                  }
+                  const replies: any[] = Array.isArray(msg.replies)
+                    ? msg.replies
+                    : [];
+                  for (const reply of replies) {
+                    const rInserted = await insertMessage(
+                      reply,
+                      true,
+                      String(msg.timestamp)
+                    );
+                    if (rInserted) {
+                      repliesInserted += 1;
+                    } else {
+                      duplicatesSkipped += 1;
+                    }
                   }
                 }
               }
-            }
 
-            persistSummary = {
-              channelsProcessed,
-              messagesInserted,
-              repliesInserted,
-              duplicatesSkipped,
-              channelsWithMissingId,
-            };
-            return { exportId };
-          });
+              const persistSummary = {
+                channelsProcessed,
+                messagesInserted,
+                repliesInserted,
+                duplicatesSkipped,
+                channelsWithMissingId,
+              };
+              return {
+                exportId,
+                insertedMessages: insertedForEmbedding,
+                summary: persistSummary,
+              };
+            });
           persistedExportId = exportId;
+          persistSummary = summary;
+
+          // Post-commit: embed newly inserted messages in batches
+          try {
+            const toEmbed = (insertedMessages || [])
+              .map((m) => ({
+                id: m.id,
+                text: (m.text || "").trim(),
+                subtype: m.subtype,
+              }))
+              .filter(
+                (m) => m.text.length > 0 && (m.subtype ?? "") !== "channel_join"
+              );
+            const batchSize = 200;
+            for (let i = 0; i < toEmbed.length; i += batchSize) {
+              const batch = toEmbed.slice(i, i + batchSize);
+              const vectors = await embeddingService.generateMultipleEmbeddings(
+                batch.map((b) => b.text)
+              );
+              const pairs = batch.map((b, idx) => ({
+                id: b.id,
+                embedding: vectors[idx] || [],
+              }));
+              await db.batchUpdateSlackMessageEmbeddings(pairs);
+              await new Promise((r) => setTimeout(r, 200));
+            }
+          } catch (e) {
+            console.warn(
+              "⚠️ Auto-embed of ingested messages failed (continuing):",
+              e
+            );
+          }
         } catch (dbError) {
           console.error("❌ Failed to persist SlackExport:", dbError);
           await errorHandler.handle(dbError, "persist_slack_export");
@@ -412,6 +472,156 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
   console.log(
     "🔐 External endpoint enabled: POST /external/slack-message (Bearer auth)"
   );
+
+  // Lightweight CORS for /api routes (optional)
+  if (process.env.CORS_ALLOW_ORIGIN || process.env.ENABLE_CORS === "true") {
+    const allowOrigin = process.env.CORS_ALLOW_ORIGIN || "*";
+    receiver.router.use("/api", (req, res, next) => {
+      res.header("Access-Control-Allow-Origin", allowOrigin);
+      res.header(
+        "Access-Control-Allow-Headers",
+        "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+      );
+      res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      if (req.method === "OPTIONS") return res.sendStatus(204);
+      next();
+    });
+  }
+
+  // Embedding search API
+  receiver.router.post("/api/search", express.json(), async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+      const { query, topK, channels, dateFrom, dateTo } = req.body || {};
+      if (!query || typeof query !== "string") {
+        res.status(400).json({ ok: false, error: "query_required" });
+        return;
+      }
+      const qEmbedding = await embeddingService.generateEmbedding(query);
+      const result = await db.query(
+        `SELECT m.id, m.channel_id, m.channel_name, m.user_id, m.ts,
+                LEFT(m.text, 300) AS text,
+                COALESCE(p.display_name, m.user_id) AS author,
+                1 - (m.embedding <=> $1::vector) AS score
+         FROM slack_message m
+         LEFT JOIN people p ON p.slack_user_id = m.user_id
+         WHERE m.embedding IS NOT NULL
+           AND COALESCE(m.subtype,'') <> 'channel_join'
+           AND ($2::text[] IS NULL OR m.channel_id = ANY($2))
+           AND ($3::timestamptz IS NULL OR m.created_at >= $3)
+           AND ($4::timestamptz IS NULL OR m.created_at <= $4)
+         ORDER BY m.embedding <=> $1::vector ASC
+         LIMIT LEAST(COALESCE($5, 20), 100)`,
+        [
+          `[${qEmbedding.join(",")}]`,
+          Array.isArray(channels) && channels.length ? channels : null,
+          dateFrom || null,
+          dateTo || null,
+          topK || 20,
+        ]
+      );
+      res.json({ ok: true, results: result.rows });
+    } catch (e) {
+      console.error("/api/search failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Summary API for a set of message IDs
+  receiver.router.post("/api/summarize", express.json(), async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+      const { messageIds } = req.body || {};
+      if (!Array.isArray(messageIds) || messageIds.length === 0) {
+        res.status(400).json({ ok: false, error: "messageIds_required" });
+        return;
+      }
+      const ids = messageIds
+        .map((x: any) => Number(x))
+        .filter((n: number) => Number.isFinite(n))
+        .slice(0, 100);
+      if (ids.length === 0) {
+        res.status(400).json({ ok: false, error: "no_valid_ids" });
+        return;
+      }
+      const rows = await db.query(
+        `SELECT text
+         FROM slack_message
+         WHERE id = ANY($1::bigint[])
+           AND text IS NOT NULL
+           AND COALESCE(subtype,'') <> 'channel_join'
+         ORDER BY id ASC`,
+        [ids]
+      );
+      const texts = rows.rows.map((r: any) => r.text as string);
+      const { summary } = await channelSummarizerService.summarizeChannel(
+        texts
+      );
+      res.json({ ok: true, summary });
+    } catch (e) {
+      console.error("/api/summarize failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Channels API for FE filters
+  receiver.router.get("/api/channels", async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+      const result = await db.query(
+        `SELECT channel_id,
+                MAX(channel_name) AS channel_name,
+                COUNT(*) AS count
+         FROM slack_message
+         WHERE channel_id IS NOT NULL
+         GROUP BY channel_id
+         ORDER BY count DESC`
+      );
+      res.json({ ok: true, channels: result.rows });
+    } catch (e) {
+      console.error("/api/channels failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
 }
 
 // Validate required environment variables

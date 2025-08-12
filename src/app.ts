@@ -507,7 +507,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     });
   }
 
-  // Embedding search API
+  // Embedding search API (now includes optional thread context)
   receiver.router.post("/api/search", express.json(), async (req, res) => {
     try {
       const configuredToken =
@@ -524,14 +524,22 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           return;
         }
       }
-      const { query, topK, channels, dateFrom, dateTo } = req.body || {};
+      const { query, topK, channels, dateFrom, dateTo, includeThreads } =
+        req.body || {};
       if (!query || typeof query !== "string") {
         res.status(400).json({ ok: false, error: "query_required" });
         return;
       }
       const qEmbedding = await embeddingService.generateEmbedding(query);
       const result = await db.query(
-        `SELECT m.id, m.channel_id, m.channel_name, m.user_id, m.ts,
+        `SELECT m.id,
+                m.channel_id,
+                m.channel_name,
+                m.user_id,
+                m.ts,
+                m.thread_ts,
+                m.parent_ts,
+                m.is_reply,
                 LEFT(m.text, 300) AS text,
                 COALESCE(p.display_name, m.user_id) AS author,
                 1 - (m.embedding <=> $1::vector) AS score
@@ -552,7 +560,57 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           topK || 20,
         ]
       );
-      res.json({ ok: true, results: result.rows });
+
+      const rows = result.rows as Array<any>;
+
+      // If requested (default true), attach full thread context per result
+      const shouldIncludeThreads = includeThreads !== false;
+      if (!shouldIncludeThreads) {
+        // Still include computed thread_root_ts and in_thread flags for FE
+        const mapped = rows.map((r) => ({
+          ...r,
+          thread_root_ts: r.thread_ts || r.parent_ts || r.ts,
+          in_thread: Boolean(r.thread_ts || r.parent_ts),
+        }));
+        res.json({ ok: true, results: mapped });
+        return;
+      }
+
+      // Build a cache of threads keyed by channel_id:root_ts to avoid duplicate fetches
+      const threadCache = new Map<string, any[]>();
+      const enhanceWithThread = async (row: any): Promise<any> => {
+        const rootTs: string = row.thread_ts || row.parent_ts || row.ts;
+        const key = `${row.channel_id}:${rootTs}`;
+        if (!threadCache.has(key)) {
+          const threadRes = await db.query(
+            `SELECT m.id,
+                    m.channel_id,
+                    m.channel_name,
+                    m.user_id,
+                    m.ts,
+                    LEFT(m.text, 1000) AS text,
+                    COALESCE(p.display_name, m.user_id) AS author
+             FROM slack_message m
+             LEFT JOIN people p ON p.slack_user_id = m.user_id
+             WHERE m.channel_id = $1
+               AND m.text IS NOT NULL
+               AND COALESCE(m.subtype, '') <> 'channel_join'
+               AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
+             ORDER BY m.ts ASC, m.id ASC`,
+            [row.channel_id, rootTs]
+          );
+          threadCache.set(key, threadRes.rows);
+        }
+        return {
+          ...row,
+          thread_root_ts: rootTs,
+          in_thread: Boolean(row.thread_ts || row.parent_ts),
+          thread: threadCache.get(key),
+        };
+      };
+
+      const enhanced = await Promise.all(rows.map(enhanceWithThread));
+      res.json({ ok: true, results: enhanced });
     } catch (e) {
       console.error("/api/search failed:", e);
       res.status(500).json({ ok: false, error: "internal_error" });
@@ -660,8 +718,15 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         }
       }
 
-      const { channel_id, user_id, dateFrom, dateTo, limit, offset } =
-        req.query as Record<string, string | undefined>;
+      const {
+        channel_id,
+        user_id,
+        dateFrom,
+        dateTo,
+        limit,
+        offset,
+        includeThreads,
+      } = req.query as Record<string, string | undefined>;
       const lim = Math.min(parseInt(limit || "500", 10) || 500, 2000);
       const off = Math.max(parseInt(offset || "0", 10) || 0, 0);
 
@@ -672,6 +737,8 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 m.user_id,
                 COALESCE(p.display_name, m.user_id) AS author,
                 m.ts,
+                m.thread_ts,
+                m.parent_ts,
                 rm[1] AS url
          FROM slack_message m
          LEFT JOIN people p ON p.slack_user_id = m.user_id
@@ -694,9 +761,109 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         ]
       );
 
-      res.json({ ok: true, links: result.rows });
+      const linkRows = (result.rows as any[]).map((r) => ({
+        ...r,
+        thread_root_ts: r.thread_ts || r.parent_ts || r.ts,
+        in_thread: Boolean(r.thread_ts || r.parent_ts),
+      }));
+
+      const shouldIncludeThreads = includeThreads === "true";
+      if (!shouldIncludeThreads) {
+        res.json({ ok: true, links: linkRows });
+        return;
+      }
+
+      // Include optional thread context for each link result (may be heavy)
+      const threadCache = new Map<string, any[]>();
+      const withThreads = [] as any[];
+      for (const row of linkRows) {
+        const rootTs: string = row.thread_root_ts;
+        const key = `${row.channel_id}:${rootTs}`;
+        if (!threadCache.has(key)) {
+          const threadRes = await db.query(
+            `SELECT m.id,
+                    m.channel_id,
+                    m.channel_name,
+                    m.user_id,
+                    m.ts,
+                    LEFT(m.text, 1000) AS text,
+                    COALESCE(p.display_name, m.user_id) AS author
+             FROM slack_message m
+             LEFT JOIN people p ON p.slack_user_id = m.user_id
+             WHERE m.channel_id = $1
+               AND m.text IS NOT NULL
+               AND COALESCE(m.subtype, '') <> 'channel_join'
+               AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
+             ORDER BY m.ts ASC, m.id ASC`,
+            [row.channel_id, rootTs]
+          );
+          threadCache.set(key, threadRes.rows);
+        }
+        withThreads.push({ ...row, thread: threadCache.get(key) });
+      }
+
+      res.json({ ok: true, links: withThreads });
     } catch (e) {
       console.error("/api/links failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Thread fetch API: return full thread messages for a channel_id + root_ts
+  receiver.router.get("/api/thread", async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const { channel_id, root_ts } = req.query as Record<
+        string,
+        string | undefined
+      >;
+      if (!channel_id || !root_ts) {
+        res
+          .status(400)
+          .json({ ok: false, error: "channel_id_and_root_ts_required" });
+        return;
+      }
+
+      const threadRes = await db.query(
+        `SELECT m.id,
+                m.channel_id,
+                m.channel_name,
+                m.user_id,
+                m.ts,
+                LEFT(m.text, 4000) AS text,
+                COALESCE(p.display_name, m.user_id) AS author
+         FROM slack_message m
+         LEFT JOIN people p ON p.slack_user_id = m.user_id
+         WHERE m.channel_id = $1
+           AND m.text IS NOT NULL
+           AND COALESCE(m.subtype, '') <> 'channel_join'
+           AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
+         ORDER BY m.ts ASC, m.id ASC`,
+        [channel_id, root_ts]
+      );
+
+      res.json({
+        ok: true,
+        channel_id,
+        thread_root_ts: root_ts,
+        messages: threadRes.rows,
+      });
+    } catch (e) {
+      console.error("/api/thread failed:", e);
       res.status(500).json({ ok: false, error: "internal_error" });
     }
   });

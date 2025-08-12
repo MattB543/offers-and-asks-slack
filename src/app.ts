@@ -622,6 +622,65 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
       res.status(500).json({ ok: false, error: "internal_error" });
     }
   });
+
+  // Links extraction API
+  receiver.router.get("/api/links", async (req, res) => {
+    try {
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const { channel_id, user_id, dateFrom, dateTo, limit, offset } =
+        req.query as Record<string, string | undefined>;
+      const lim = Math.min(parseInt(limit || "500", 10) || 500, 2000);
+      const off = Math.max(parseInt(offset || "0", 10) || 0, 0);
+
+      const result = await db.query(
+        `SELECT m.id AS message_id,
+                m.channel_id,
+                m.channel_name,
+                m.user_id,
+                COALESCE(p.display_name, m.user_id) AS author,
+                m.ts,
+                rm[1] AS url
+         FROM slack_message m
+         LEFT JOIN people p ON p.slack_user_id = m.user_id
+         CROSS JOIN LATERAL regexp_matches(m.text, '(https?://[^\\s>|]+)', 'g') rm
+         WHERE m.text IS NOT NULL
+           AND COALESCE(m.subtype,'') <> 'channel_join'
+           AND ($1::text IS NULL OR m.channel_id = $1)
+           AND ($2::text IS NULL OR m.user_id = $2)
+           AND ($3::timestamptz IS NULL OR m.created_at >= $3)
+           AND ($4::timestamptz IS NULL OR m.created_at <= $4)
+         ORDER BY m.id DESC
+         LIMIT $5 OFFSET $6`,
+        [
+          channel_id || null,
+          user_id || null,
+          dateFrom || null,
+          dateTo || null,
+          lim,
+          off,
+        ]
+      );
+
+      res.json({ ok: true, links: result.rows });
+    } catch (e) {
+      console.error("/api/links failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
 }
 
 // Validate required environment variables

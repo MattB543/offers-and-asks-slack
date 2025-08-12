@@ -580,6 +580,76 @@ export class ChannelSummarizerService {
       .join(" ");
     return { summary, model };
   }
+
+  async summarizeTopicFromThreads(input: {
+    searchQuery?: string | null;
+    threads: Array<{
+      channel_id: string;
+      channel_name?: string | null;
+      thread_root_ts: string;
+      messages: Array<{
+        id: number;
+        channel_id: string;
+        channel_name?: string | null;
+        user_id: string;
+        author: string;
+        ts: string;
+        text: string;
+      }>;
+    }>;
+    capturePrompt?: (type: string, content: string) => void;
+  }): Promise<string> {
+    const { searchQuery, threads, capturePrompt } = input;
+
+    const systemPrompt = [
+      "You are summarizing Slack activity for a topic.",
+      "You will receive a JSON dump of messages grouped by thread.",
+      "Some messages may be irrelevant; ignore anything that does not help summarize the topic.",
+      "Goal: produce simple, concise, readable bullets broken down by individual points/updates/findings.",
+      "Prefer clear, scannable phrasing. Avoid fluff. Group related points if helpful.",
+      "Output only markdown text (a bulleted list and optional sub-bullets). No code fences. No extra commentary.",
+    ].join(" ");
+
+    const userPayload = {
+      search_query: searchQuery || null,
+      guidance: {
+        include_only_relevant: true,
+        style: "concise-bullets",
+        output_format: "markdown-only",
+      },
+      threads: threads.map((t) => ({
+        channel_id: t.channel_id,
+        channel_name: t.channel_name ?? null,
+        thread_root_ts: t.thread_root_ts,
+        messages: t.messages.map((m) => ({
+          id: m.id,
+          ts: m.ts,
+          user_id: m.user_id,
+          author: m.author,
+          text: m.text,
+        })),
+      })),
+    };
+
+    const composed = `System Prompt\n\n${systemPrompt}\n\nUser Payload (JSON)\n\n${JSON.stringify(
+      userPayload
+    )}`;
+
+    capturePrompt?.("system", systemPrompt);
+    capturePrompt?.("user", JSON.stringify(userPayload, null, 2));
+
+    const response = await this.openai.responses.create({
+      model: "gpt-5-mini",
+      reasoning: { effort: "low" },
+      input: composed,
+      temperature: 1,
+      max_output_tokens: 10000,
+    });
+
+    const content = (response as any).output_text?.trim() || "";
+    // Return as-is; caller expects markdown
+    return content;
+  }
 }
 
 export const channelSummarizerService = new ChannelSummarizerService();

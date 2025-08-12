@@ -167,7 +167,11 @@ export class Database {
       `SELECT id, text
        FROM slack_message
        WHERE text IS NOT NULL
-         AND COALESCE(subtype,'') <> 'channel_join'
+         AND COALESCE(subtype,'') NOT IN (
+           'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+           'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+           'channel_archive','channel_unarchive','group_join','group_leave'
+         )
          AND text ~ '\\S'
          AND embedding IS NULL
        ORDER BY id ASC
@@ -216,7 +220,10 @@ export class Database {
   async getPerson(userId: string): Promise<any> {
     // First try by slack_user_id, then fallback to user_id
     let result = await this.query(
-      "SELECT * FROM people WHERE slack_user_id = $1",
+      `SELECT * FROM people
+       WHERE slack_user_id = $1
+       ORDER BY updated_at DESC NULLS LAST
+       LIMIT 1`,
       [userId]
     );
 
@@ -321,11 +328,15 @@ export class Database {
     // First try to find by slack_user_id, then fallback to user_id
     let result = await this.query(
       `SELECT s.id, s.skill 
-       FROM skills s 
-       JOIN person_skills ps ON s.id = ps.skill_id 
-       JOIN people p ON ps.user_id = p.user_id
-       WHERE p.slack_user_id = $1
-       ORDER BY s.skill`,
+         FROM skills s 
+         JOIN person_skills ps ON s.id = ps.skill_id 
+         JOIN (
+           SELECT DISTINCT ON (user_id) user_id
+           FROM people
+           WHERE slack_user_id = $1
+           ORDER BY user_id, updated_at DESC NULLS LAST
+         ) p ON ps.user_id = p.user_id
+         ORDER BY s.skill`,
       [userId]
     );
 
@@ -486,7 +497,11 @@ export class Database {
        FROM slack_message
        WHERE user_id = $1
          AND text IS NOT NULL
-         AND COALESCE(subtype, '') <> 'channel_join'
+         AND COALESCE(subtype,'') NOT IN (
+           'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+           'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+           'channel_archive','channel_unarchive','group_join','group_leave'
+         )
        ORDER BY id DESC
        LIMIT $2`,
       [slackUserId, limit]
@@ -520,7 +535,11 @@ export class Database {
            FROM slack_message
            WHERE channel_id = $1
              AND text IS NOT NULL
-             AND COALESCE(subtype, '') <> 'channel_join'
+              AND COALESCE(subtype,'') NOT IN (
+                'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+                'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+                'channel_archive','channel_unarchive','group_join','group_leave'
+              )
              AND (
                ts = $2 OR parent_ts = $2 OR thread_ts = $2
              )
@@ -586,7 +605,11 @@ export class Database {
          FROM slack_message
          WHERE user_id = $1
            AND text IS NOT NULL
-           AND COALESCE(subtype, '') <> 'channel_join'
+           AND COALESCE(subtype,'') NOT IN (
+             'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+             'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+             'channel_archive','channel_unarchive','group_join','group_leave'
+           )
        )
        SELECT a.channel_id,
               max(a.channel_name) AS channel_name,
@@ -659,7 +682,11 @@ export class Database {
            FROM slack_message
            WHERE channel_id = $1
              AND text IS NOT NULL
-             AND COALESCE(subtype, '') <> 'channel_join'
+              AND COALESCE(subtype,'') NOT IN (
+                'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+                'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+                'channel_archive','channel_unarchive','group_join','group_leave'
+              )
              AND (
                ts = $2 OR parent_ts = $2 OR thread_ts = $2
              )

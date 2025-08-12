@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS slack_message (
   channel_name TEXT,
   ts TEXT NOT NULL,
   user_id TEXT,
+  user_name TEXT,
   text TEXT,
   message_type TEXT,
   subtype TEXT,

@@ -254,13 +254,39 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                   }
                 }
 
+                // Cache resolved display names to minimize DB lookups within this transaction
+                const displayNameCache = new Map<string, string>();
+                const resolveDisplayName = async (
+                  slackUserId: string | null
+                ): Promise<string | null> => {
+                  if (!slackUserId) return null;
+                  if (displayNameCache.has(slackUserId)) {
+                    return displayNameCache.get(slackUserId)!;
+                  }
+                  const res = await client.query(
+                    `SELECT display_name FROM people WHERE slack_user_id = $1 LIMIT 1`,
+                    [slackUserId]
+                  );
+                  const dn =
+                    (res.rows?.[0]?.display_name as string | undefined) || null;
+                  if (dn) displayNameCache.set(slackUserId, dn);
+                  return dn;
+                };
+
                 const insertMessage = async (
                   msg: any,
                   isReply: boolean,
                   parentTs: string | null
                 ) => {
-                  const ts: string = String(msg.timestamp);
-                  const userId: string | null = msg.user ?? null;
+                  const ts: string = String(
+                    (msg && (msg.timestamp ?? msg.ts)) as any
+                  );
+                  const userId: string | null =
+                    (msg && (msg.user_id ?? msg.user)) ?? null;
+                  // Prefer canonical display_name from our people table; fallback to raw user_name
+                  const userNameFromDb = await resolveDisplayName(userId);
+                  const userName: string | null =
+                    userNameFromDb ?? msg?.user_name ?? null;
                   const text: string | null = msg.text ?? null;
                   const messageType: string | null = msg.type ?? null;
                   const subtype: string | null = msg.subtype ?? null;
@@ -276,6 +302,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     channel_name,
                     ts,
                     user_id,
+                      user_name,
                     text,
                     message_type,
                     subtype,
@@ -284,7 +311,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     parent_ts,
                     raw
                   ) VALUES (
-                    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb
+                      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb
                   ) ON CONFLICT (channel_id, ts) DO NOTHING RETURNING id, text, subtype`,
                     [
                       exportId,
@@ -293,6 +320,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                       channelName,
                       ts,
                       userId,
+                      userName,
                       text,
                       messageType,
                       subtype,
@@ -335,7 +363,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     const rInserted = await insertMessage(
                       reply,
                       true,
-                      String(msg.timestamp)
+                      String((msg && (msg.timestamp ?? msg.ts)) as any)
                     );
                     if (rInserted) {
                       repliesInserted += 1;
@@ -541,12 +569,22 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 m.parent_ts,
                 m.is_reply,
                 LEFT(m.text, 300) AS text,
-                COALESCE(p.display_name, m.user_id) AS author,
+                 COALESCE(p.display_name, m.user_id) AS author,
                 1 - (m.embedding <=> $1::vector) AS score
          FROM slack_message m
-         LEFT JOIN people p ON p.slack_user_id = m.user_id
+          LEFT JOIN LATERAL (
+            SELECT display_name
+            FROM people
+            WHERE slack_user_id = m.user_id
+            ORDER BY updated_at DESC NULLS LAST
+            LIMIT 1
+          ) p ON true
          WHERE m.embedding IS NOT NULL
-           AND COALESCE(m.subtype,'') <> 'channel_join'
+            AND COALESCE(m.subtype,'') NOT IN (
+              'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+              'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+              'channel_archive','channel_unarchive','group_join','group_leave'
+            )
            AND ($2::text[] IS NULL OR m.channel_id = ANY($2))
            AND ($3::timestamptz IS NULL OR m.created_at >= $3)
            AND ($4::timestamptz IS NULL OR m.created_at <= $4)
@@ -589,12 +627,22 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                     m.user_id,
                     m.ts,
                     LEFT(m.text, 1000) AS text,
-                    COALESCE(p.display_name, m.user_id) AS author
+                     COALESCE(p.display_name, m.user_id) AS author
              FROM slack_message m
-             LEFT JOIN people p ON p.slack_user_id = m.user_id
+              LEFT JOIN LATERAL (
+                SELECT display_name
+                FROM people
+                WHERE slack_user_id = m.user_id
+                ORDER BY updated_at DESC NULLS LAST
+                LIMIT 1
+              ) p ON true
              WHERE m.channel_id = $1
                AND m.text IS NOT NULL
-               AND COALESCE(m.subtype, '') <> 'channel_join'
+                AND COALESCE(m.subtype,'') NOT IN (
+                  'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+                  'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+                  'channel_archive','channel_unarchive','group_join','group_leave'
+                )
                AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
              ORDER BY m.ts ASC, m.id ASC`,
             [row.channel_id, rootTs]
@@ -634,7 +682,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           return;
         }
       }
-      const { messageIds } = req.body || {};
+      const { messageIds, searchQuery } = req.body || {};
       if (!Array.isArray(messageIds) || messageIds.length === 0) {
         res.status(400).json({ ok: false, error: "messageIds_required" });
         return;
@@ -647,20 +695,120 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         res.status(400).json({ ok: false, error: "no_valid_ids" });
         return;
       }
-      const rows = await db.query(
-        `SELECT text
-         FROM slack_message
-         WHERE id = ANY($1::bigint[])
-           AND text IS NOT NULL
-           AND COALESCE(subtype,'') <> 'channel_join'
-         ORDER BY id ASC`,
+      // Fetch base info for the selected messages including channel + timing to resolve threads
+      const baseRowsRes = await db.query(
+        `SELECT m.id,
+                m.channel_id,
+                m.channel_name,
+                m.ts,
+                m.thread_ts,
+                m.parent_ts
+         FROM slack_message m
+         WHERE m.id = ANY($1::bigint[])`,
         [ids]
       );
-      const texts = rows.rows.map((r: any) => r.text as string);
-      const { summary } = await channelSummarizerService.summarizeChannel(
-        texts
+
+      const baseRows: Array<{
+        id: number;
+        channel_id: string;
+        channel_name: string | null;
+        ts: string;
+        thread_ts: string | null;
+        parent_ts: string | null;
+      }> = baseRowsRes.rows as any;
+
+      if (baseRows.length === 0) {
+        res.status(404).json({ ok: false, error: "messages_not_found" });
+        return;
+      }
+
+      // Determine unique threads to include (full context for each selected message)
+      const threadKeys = new Map<
+        string,
+        { channel_id: string; root_ts: string; channel_name: string | null }
+      >();
+      for (const r of baseRows) {
+        const rootTs = (r.thread_ts || r.parent_ts || r.ts) as string;
+        const key = `${r.channel_id}:${rootTs}`;
+        if (!threadKeys.has(key)) {
+          threadKeys.set(key, {
+            channel_id: r.channel_id,
+            root_ts: rootTs,
+            channel_name: r.channel_name,
+          });
+        }
+      }
+
+      // Fetch full thread messages for each unique thread
+      const threads: Array<{
+        channel_id: string;
+        channel_name: string | null;
+        thread_root_ts: string;
+        messages: Array<{
+          id: number;
+          channel_id: string;
+          channel_name: string | null;
+          user_id: string;
+          author: string;
+          ts: string;
+          text: string;
+        }>;
+      }> = [];
+
+      for (const tk of threadKeys.values()) {
+        const threadRes = await db.query(
+          `SELECT m.id,
+                  m.channel_id,
+                  m.channel_name,
+                  m.user_id,
+                  m.ts,
+                  LEFT(m.text, 4000) AS text,
+                  COALESCE(p.display_name, m.user_id) AS author
+           FROM slack_message m
+            LEFT JOIN LATERAL (
+              SELECT display_name
+              FROM people
+              WHERE slack_user_id = m.user_id
+              ORDER BY updated_at DESC NULLS LAST
+              LIMIT 1
+            ) p ON true
+           WHERE m.channel_id = $1
+             AND m.text IS NOT NULL
+             AND COALESCE(m.subtype,'') NOT IN (
+               'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+               'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+               'channel_archive','channel_unarchive','group_join','group_leave'
+             )
+             AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
+           ORDER BY m.ts ASC, m.id ASC`,
+          [tk.channel_id, tk.root_ts]
+        );
+
+        threads.push({
+          channel_id: tk.channel_id,
+          channel_name: tk.channel_name,
+          thread_root_ts: tk.root_ts,
+          messages: (threadRes.rows as any[]).map((m) => ({
+            id: m.id,
+            channel_id: m.channel_id,
+            channel_name: m.channel_name,
+            user_id: m.user_id,
+            author: m.author,
+            ts: m.ts,
+            text: m.text,
+          })),
+        });
+      }
+
+      // Call improved summarizer to get markdown bullets
+      const markdown = await channelSummarizerService.summarizeTopicFromThreads(
+        {
+          searchQuery: typeof searchQuery === "string" ? searchQuery : null,
+          threads,
+        }
       );
-      res.json({ ok: true, summary });
+
+      res.json({ ok: true, summary: markdown, threads });
     } catch (e) {
       console.error("/api/summarize failed:", e);
       res.status(500).json({ ok: false, error: "internal_error" });
@@ -735,16 +883,26 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 m.channel_id,
                 m.channel_name,
                 m.user_id,
-                COALESCE(p.display_name, m.user_id) AS author,
+                 COALESCE(p.display_name, m.user_id) AS author,
                 m.ts,
                 m.thread_ts,
                 m.parent_ts,
                 rm[1] AS url
          FROM slack_message m
-         LEFT JOIN people p ON p.slack_user_id = m.user_id
+          LEFT JOIN LATERAL (
+            SELECT display_name
+            FROM people
+            WHERE slack_user_id = m.user_id
+            ORDER BY updated_at DESC NULLS LAST
+            LIMIT 1
+          ) p ON true
          CROSS JOIN LATERAL regexp_matches(m.text, '(https?://[^\\s>|]+)', 'g') rm
          WHERE m.text IS NOT NULL
-           AND COALESCE(m.subtype,'') <> 'channel_join'
+           AND COALESCE(m.subtype,'') NOT IN (
+             'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+             'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+             'channel_archive','channel_unarchive','group_join','group_leave'
+           )
            AND ($1::text IS NULL OR m.channel_id = $1)
            AND ($2::text IS NULL OR m.user_id = $2)
            AND ($3::timestamptz IS NULL OR m.created_at >= $3)
@@ -847,10 +1005,20 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
                 LEFT(m.text, 4000) AS text,
                 COALESCE(p.display_name, m.user_id) AS author
          FROM slack_message m
-         LEFT JOIN people p ON p.slack_user_id = m.user_id
+         LEFT JOIN LATERAL (
+           SELECT display_name
+           FROM people
+           WHERE slack_user_id = m.user_id
+           ORDER BY updated_at DESC NULLS LAST
+           LIMIT 1
+         ) p ON true
          WHERE m.channel_id = $1
            AND m.text IS NOT NULL
-           AND COALESCE(m.subtype, '') <> 'channel_join'
+           AND COALESCE(m.subtype,'') NOT IN (
+             'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+             'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+             'channel_archive','channel_unarchive','group_join','group_leave'
+           )
            AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
          ORDER BY m.ts ASC, m.id ASC`,
         [channel_id, root_ts]

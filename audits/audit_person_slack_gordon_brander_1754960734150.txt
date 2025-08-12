@@ -1,0 +1,693 @@
+=== Audit: Person Skill Rebuild ===
+Generated at: 2025-08-12T01:05:34.150Z
+
+-- Person --
+user_id: slack_gordon_brander
+slack_user_id: U098C1ZB1NU
+display_name: Gordon Brander
+enabled: true
+
+-- Profile fields --
+most_interested_in: AI Exocortexes: amplifying human intelligence, creativity, and decision-making with AI. Agency means staying in the OODA loop. To keep up with AI, we’ll need to augment ourselves with AI. Currently building Deep Future, an exocortex for thinking more effectively with AI about futures.
+confusion: The proliferation of open models suggests a world inhabited by millions of AI agents, not one singular entity. Under these conditions, reasoning is less an individual activity, more of an emergent network phenomenon. How do we think together with AIs and egregores?
+expertise: Scenario planning + futures / founding early-stage startups / product + design / agent sandboxing + privacy / decentralized protocols
+projects: Deep Future - Deep Research but for scenario planning
+asks: Intros to govt/policymakers/industry folks who would benefit from better foresight, better strategic analysis. My theory of change is to empower high-leverage decision-makers to make better decisions resulting in maximum deep benefit. gordonbrander@gmail.com +1 720-375-0022
+offers: Scenario planning/foresight. Founding seed-stage startups / raising seed. App dev. Front-end. Product design.
+
+-- Messages (up to 200, formatted with thread context) --
+count: 52
+- #lab-notes-ben-sklaroff: @Ben_Sklaroff: <@U093S356KAS> the cooperative license, high-level is that it's roughly MIT license for coops + non-profits, and LGPL for (non worker-coop) for-profits. So just a small bit of legal advantage for the worker coops: <https://github.com/bsklaroff/cooperative-license> -> @Gordon_Brander reply: Holy mackerel, that's amazing! | I've been tracking the development of open source licenses that try to close the economic loop for a while. Cooperative License is one of the cooler riffs I've seen so far! | Fair Source is another interesting one. Source-available, free for personal use and non-competing uses. Converts to Apache/MIT after 2 years. <https://fsl.software/> | <@U098C1ZE2M6> oh wow, you're behind the Cooperative License?! Awesome!
+- #lab-notes-oly: @Oliver_Sourbut: Had a thought about voting mechanisms. We all have our pet peeves with status quo typical voting mechanisms. They're terrible. But they're tenured. Maybe a lot of the resistance to change comes from a kind of fearful default conservatism. After all, if we shake up our voting system today, what's to stop it getting shaken up (badly) tomorrow? Norms and rituals in general get a kind of potency this way through the aging process, for good or ill. -> @Gordon_Brander reply: Probably a pace layers angle to this as well <https://jods.mitpress.mit.edu/pub/issue3-brand/release/2> | Lindy practices get folded into lower, slower layers so they won't get lost. The slowness acts as long-term memory, preventing practices from getting lost during generational cycles. | Francis Fukuyama has some great passages in The Origins of Political Order that hint at an evolutionary biological mechanism for this kind of conservatism | Basically humans are mimetic animals... monkey see monkey do. | and this bias toward imitation over innovation gives us a slightly conservative bent. Conservative as in conserving of the status quo. | This is how institutions form. We copy what works, and keep copying it, and reproduce the institution. "Civilization advances by extending the number of important operations which we can perform without thinking about them." | so this is cool bc imitation lets us quickly converge around Schelling points of behavior and benefit from the economies of scale of cooperation | but then sometimes these practices fall out of evolutionary fitness vs the environment | Fukuyama: &gt; There is something like a law of the conservation of institutions. Human beings are rule-following animals by nature; they are born to conform to the social norms they see around them, and they entrench those rules with often transcendent meaning and value. When the surrounding environment changes and new challenges arise, there is often a disjunction between existing institutions and present needs
+- #lab-notes-gordon: @Gordon_Brander: Back in Nairobi :flag-ke:
+- #lab-notes-gordon: @Gordon_Brander: doing a little moodboarding as pre-work for making a landing page <https://www.are.na/share/PvGGXHm>
+- #lab-notes-gordon: @Gordon_Brander: getting inspired by amber/orange FUI and euroracks
+- #lab-notes-gordon: @Gordon_Brander: I think the JTBD for Deep Future is to feel like you have 10x more leverage
+- #lab-notes-gordon: @Gordon_Brander: Just-According-to-Keikaku-as-a-Service
+- #lab-notes-gordon: @Gordon_Brander: Another lens: AI Scenario Planning as an Engine-Building game
+- #lab-notes-gordon: @Gordon_Brander: Another lens: ritual design <https://newsletter.squishy.computer/p/ritual-technology>. Our goal is to (1) generate strategic insights with AI (2) get those insights into your OODA loop. So we need to close the loop. Part of what we're doing is designing a daily/monthly/quarterly ritual.
+- #lab-notes-gordon: @Gordon_Brander: Orientation is the crux of the OODA loop: <https://newsletter.squishy.computer/p/tools-for-thought-in-your-ooda-loop> &gt; For Boyd, the most important factor for survival is your sense-making system. This is the thing that keeps you oriented. There’s a reason that “orient” is the biggest circle on the OODA diagram. We survive by making sense. When orientation breaks down—when you are _disoriented_—you lose your agency. Your model is wrong. You pay attention to the wrong things, your actions stop making sense, you flail.
+- #lab-notes-gordon: @Gordon_Brander: Dreamy jetlag productivity radio <https://www.nts.live/shows/early-bird/episodes/early-bird-arushi-jain-18th-july-2025>
+- #lab-notes-gordon: @Gordon_Brander: DARPA mention got me thinking about FLF as a DARPA for lightcone alignment. Original DARPA mission: "To create and prevent strategic surprise."
+- #lab-notes-gordon: @Gordon_Brander: A meditation on creativity from the most creatively prolific person I know <https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0|https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0>
+- #lab-notes-gordon: @Gordon_Brander: I like this... using AI agents as market intermediaries <https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi|https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi>
+- #lab-notes-gordon: @Gordon_Brander: Bookmarking this to look at later
+- #lab-notes-gordon: @Gordon_Brander: :shushing_face: domain registered: possible.systems
+- #lab-notes-gordon: @Gordon_Brander: not committed yet, but I like the cheeky double-meaning
+- #lab-notes-gordon: @Gordon_Brander: Noting as an example of the kind of *actionable* strategic insight that falls out of forecasting/scenario planning.
+- #lab-notes-gordon: @Gordon_Brander: <https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k|https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k>
+- #lab-notes-gordon: @Gordon_Brander: RAND: Enhancing Strategic Planning with Massive Scenario Generation
+- #lab-notes-gordon: @Gordon_Brander: landing page hacking this am (WIP)
+- #lab-notes-gordon: @Gordon_Brander: I keep re-learning this lesson over and over: block it out before you jump into detail work.
+- #lab-notes-gordon: @Gordon_Brander: in this case, start with the headlines and copy
+- #lab-notes-gordon: @Gordon_Brander: Speaking of... for anyone thinking of pitching VCs eventually, this is the best resource on building a pitch deck I have yet found: <https://visionquest.spacecadet.ventures/phases/pitch>
+- #lab-notes-gordon: @Gordon_Brander: <@U098C1ZHJMN> and I were talking about Carlota Perez's Technological Revolutions and Financial Capital and her AI-driven green growth thesis <https://carlotaperez.org/wp-content/downloads/new-book/outputs/working-papers/BTTR_WP_2017-1.pdf>
+- #lab-notes-gordon: @Gordon_Brander: Bookmarking this CRM of scenario planning contacts <@U098C1ZHJMN> and I are collaborating on <https://docs.google.com/spreadsheets/d/1TX6gOsGq5iI6mYzX8edUB5TaHr_SPbvZst28xgKjxRE/edit?gid=0#gid=0>
+- #lab-notes-gordon: @Gordon_Brander: Great article and a good example of advice that would benefit from some scenario planning. Imagine how much better this advice would be if it was tracked across three scenarios / if the claims were mapped back to driving forces, etc <https://80000hours.org/agi/guide/skills-ai-makes-valuable/|https://80000hours.org/agi/guide/skills-ai-makes-valuable/>
+- #lab-notes-gordon: @Gordon_Brander: It’s weird and hopeful that LLMs are so align-able. I mean, it opens up other vectors of attack, like mass propaganda, but these seem to me to exist in a different threat class. <https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k|https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k>
+- #lab-notes-gordon: @Gordon_Brander: superintelligence -&gt; superagency
+- #lab-notes-gordon: @Gordon_Brander: humanity chart a path from a -&gt; b challenge
+- #lab-notes-gordon: @Gordon_Brander: These days, I'm always running a meta-process in my head where if I start working on a task, I stop, frame the task as a prompt, and let the AI take a first crack at the problem. Sometimes I even run the meta-meta-process and let the AI define what the task should be from my stream-of-consciousness braindump.
+- #lab-notes-gordon: @Gordon_Brander: My code repos are becoming 80% markdown: • `notes/` raw stream of consciousness notes and prompting • `specs/` specifications co-created with AI. • `prompts/` md files used to prompt agents or AI-driven parts of system My general vibe-coding workflow: 1. chat with Claude Code about requirements, dump to `notes/` 2. @include notes, prompt Claude Code to write a spec from notes, dump to `specs/` 3. @include spec, prompt Claude Code to write unit tests from spec 4. @include spec and unit tests, prompt Claude Code to write module
+- #lab-notes-gordon: @Gordon_Brander: figma-ing this am. I'm less happy with this mockup, but I think it's a "push past the local maxima" situation. We'll get there.
+- #lab-notes-gordon: @Gordon_Brander: Reached out to Mick Costigan (head of Salesforce Futures, former GBN, WEF AI Policy team)
+- #lab-notes-gordon: @Gordon_Brander: Reached out to Karl Schroeder (scenario planning, futurist, hard sci-fi author, author Stealing Worlds)
+- #lab-notes-gordon: @Gordon_Brander: Created DigitalOcean droplet for Deep Future project
+- #lab-notes-gordon: @Gordon_Brander: huh, a friend sends this along and says "scenario visualization!" <https://arstechnica.com/ai/2025/08/deepmind-reveals-genie-3-world-model-that-creates-real-time-interactive-simulations/>
+- #lab-notes-gordon: @Gordon_Brander: Got around to reading that Eric Drexler post <@U093S356KAS> shared and man is it good <https://aiprospects.substack.com/p/ai-options-not-optimism|https://aiprospects.substack.com/p/ai-options-not-optimism> &gt; Here’s an easy and effective way to misunderstand our situation: &gt; &gt; “We’re on a path to superintelligence, which may be impossible to control and hence likely to destroy us. Therefore, we can’t assume that powerful AI will help us solve seemingly intractable problems. To assume otherwise would be naïvely optimistic, and with so many critical problems, our odds of success are poor.” &gt; &gt; Here’s a better way to think about it: &gt; &gt; “We’re on a path to superintelligence, which must be steerable, or nothing else matters. Therefore, in every future that matters we can assume that powerful AI will help us solve seemingly intractable problems. Our options in a hypercapable world are largely unexplored, and our overall odds of success are unknown.” &gt; &gt; In this situation, debating odds of success is pointless, exploring options is crucial, and optimism is irrelevant. &gt; &gt; Participants don’t think like spectators.
+- #lab-notes-gordon: @Gordon_Brander: This AM, jotted down a few ideas on using storylets to generate atomic micro-scenarios <https://emshort.blog/2019/11/29/storylets-you-want-them/>
+- #lab-notes-gordon: @Gordon_Brander: set the channel topic: Epistemic status: thinking out loud
+- #lab-notes-gordon: @Gordon_Brander: Asked Claude Opus what questions our email waitlist form should have. Result:
+- #lab-notes-gordon: @Gordon_Brander: Cool talk <https://overcast.fm/+AA9poeScDZw|https://overcast.fm/+AA9poeScDZw>
+- #lab-notes-gordon: @Gordon_Brander: Putting on some focus music and coding up that landing page <https://eremiterecords.bandcamp.com/album/mondays-at-the-enfield-tennis-academy>
+- #lab-notes-gordon: @Gordon_Brander: Little intro deck I made for a scenario planning workshop featuring [super secret undisclosed participants] a few years ago. Would be happy to give this as a lightning talk if anyone is interested.
+- #lab-notes-herbie: @Gordon_Brander: &gt; However! AI reads the notes when sourcing information/browsing the web, and is ~guaranteed to do so if it reads the page. And a single community note readable by AI can propagate into influence on AI-written answers to questions/content in many places around the web. This seems like an insanely powerful leverage point, given that LLMs will be doing the vast majority of cultural production going forward.
+- #lab-notes-herbie: @Gordon_Brander: That's my sense at least. Given LLMs can produce images and text faster and cheaper than we can (by orders of magnitude), I have a hard time seeing futures where they aren't driving the OODA loop of culture. And if that's the case, maybe the primary audience for community notes is the AIs.
+- #surface-area-nuno: <@U0980RYU7JT>: I'm also trying a new 21K follower twitter account as a means of increasing our distribution. It previously belonged to a prediction market competitor, so hopefully there is a bit of overlap. Retweets particularly appreciated this week, even from small accounts, to train the Twitter algorithm a little bit <https://x.com/XriskFYI/status/1952431521429893560> -> @Gordon_Brander reply: Sentinel shilling on Substack this AM
+- #surface-area-nuno: <@U0980RYU7JT>: <https://en.wikipedia.org/wiki/Folie_à_deux> ; shared psychosis. Could be relevant to predicting AI superpersuasion -> @Gordon_Brander reply: Another signal might be tightness of the feedback loop between person and AI. Generally, the tighter the loop, the greater the synchronization between systems, and the part of the system with the most variety will control the direction of the combined system <https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety|https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety>
+- #lab-notes-sethkillian: @Seth_Killian: My scratchpad notes on something I've been stuck on for a while re: potential recursive effects of prediction, and how they can bound utility and effectiveness over time. <https://docs.google.com/document/d/1cWS9Z0D9X-dbt2TLUbPKrw3_nhgutd8t7A9TkXZyMj0/edit?tab=t.0> Grateful to a number of fellowship folks who have offered reflections and encouragement, <@U098C1ZDD16> <@U093W3TNLFM> and <@U093S2ZM20N> Not sure this is a robust fellowship project but I will take a run at turning into a paper if only for my own amusement. Related phenomenon definitely show up in other domains, but thoughts, additional references, or deflations very welcome. -> @Gordon_Brander reply: I think there may also be a nuance here about open worlds vs closed worlds. In a closed world, successful prediction might have a washout effect over repeated games between a fixed set of players. In an open world, new players, new information, new interactions, and new knock-on effects will continually open up new competitive landscapes where prediction can be newly useful
+- #lab-notes-jlevy: @Joshua_Levy: so this is in the weeds a bit but relevant to some of these tools: I’ve been writing and formats for metadata and asset bundling for Markdown and other documents in a way that is useful for AI apps. two repos: <https://github.com/jlevy/frontmatter-format> -> @Gordon_Brander reply: Quick thought: 11ty, one of the more popular static site generators, allows for yaml blocks at the top of any kind of file: ```--- title: Foo tags: [bar] ---``` The syntax is the same (---) regardless of file type. There are several other static site generators that copy 11ty’s approach. Advantages: • same syntax = familiarity • copy-paste-able • composable… same frontmatter could be catted to any file without worrying about wrapper • compatibility with 11ty and other static site generators that copy this approach Disadvantages: • file is invalid until preprocessor strips out the frontmatter. Might consider this approach for compatibility with existing 11ty ecosystem. | Clarifying: in 11ty, you can add these blocks to *any* file type. `.md`, `.html`, `.json`, `.whatever`. It's always triple dashes, regardless of file type, e.g.: ```--- title: Foo tags: [bar] ---``` Not based on file type e.g.: ```&lt;!-- title: Foo tags: [bar] --&gt;``` | nice
+- #lab-notes-alex-van-grootel: @Gordon_Brander: Stewart Candy is behind the excellent design game Thing From The Future <https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf|https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf>
+- #lab-notes-ben-goldhaber: @Ben_Goldhaber: (5 min brainstorm) thinking about scenarios where I personally want better scenario planning tools • my finances: what are the different situations I'm trying to plan for with my portfolio allocation, in what worlds would I have preferred different risk levels, how important in different scenarios is liquidity to me. • project planning: what were the different scenarios for the fellowship and what would have been decision relevant, both on the micro side: aka if we had had 90% remote fellows, or 10% remote fellows, what changes? and on the macro side: if my timelines for AGI were 2x or 3x as long, what does this imply about staggering the fellowship. • general orientating: what does a given AI future scenario *mean* - if we have 1mil agents running around, how do I think that world is going to look. Scenario planning as sci-fi vignettes. not exhaustive, but in all of these it feels to me like I'm trying to do... some kind of exploration of a fictional world that hasn't yet come to past, so that I can notice and really feel what I care about in that world. Brainstorm inspired by <@U098C1ZB1NU>'s landing page. -> @Gordon_Brander reply: Would love to riff/brainstorm with you on this. VC sometime? | Booked! | Career planning is another use case that comes to mind.
+
+-- Existing skills (before) --
+- Agent sandboxing
+- AI-assisted code generation & unit-test generation
+- AI-driven scenario generation
+- CSS scroll-driven animations
+- Decentralized protocols
+- DigitalOcean deployment
+- Figma
+- Front-end development
+- Futures forecasting
+- LLM orchestration and agent workflows
+- Markdown and frontmatter metadata
+- Privacy engineering for AI agents
+- Product design
+- Prompt engineering for LLMs
+- Scenario planning
+- Scenario visualization
+- Seed-stage fundraising and investor outreach
+- Static site generators (11ty / Jekyll)
+- Structural analysis (STEEP / driving forces)
+- Wargaming and tabletop exercises
+- WebGL
+
+-- Model Input JSON (profile + sample_messages + example_skills_for_specificity_guidance) --
+{
+  "profile": {
+    "name": "Gordon Brander",
+    "expertise": "Scenario planning + futures / founding early-stage startups / product + design / agent sandboxing + privacy / decentralized protocols",
+    "projects": "Deep Future - Deep Research but for scenario planning",
+    "offers": "Scenario planning/foresight. Founding seed-stage startups / raising seed. App dev. Front-end. Product design.",
+    "asks": "Intros to govt/policymakers/industry folks who would benefit from better foresight, better strategic analysis. My theory of change is to empower high-leverage decision-makers to make better decisions resulting in maximum deep benefit. gordonbrander@gmail.com +1 720-375-0022",
+    "most_interested_in": "AI Exocortexes: amplifying human intelligence, creativity, and decision-making with AI. Agency means staying in the OODA loop. To keep up with AI, we’ll need to augment ourselves with AI. Currently building Deep Future, an exocortex for thinking more effectively with AI about futures.",
+    "confusion": "The proliferation of open models suggests a world inhabited by millions of AI agents, not one singular entity. Under these conditions, reasoning is less an individual activity, more of an emergent network phenomenon. How do we think together with AIs and egregores?"
+  },
+  "sample_messages": [
+    "#lab-notes-ben-sklaroff: @Ben_Sklaroff: <@U093S356KAS> the cooperative license, high-level is that it's roughly MIT license for coops + non-profits, and LGPL for (non worker-coop) for-profits. So just a small bit of legal advantage for the worker coops: <https://github.com/bsklaroff/cooperative-license> -> @Gordon_Brander reply: Holy mackerel, that's amazing! | I've been tracking the development of open source licenses that try to close the economic loop for a while. Cooperative License is one of the cooler riffs I've seen so far! | Fair Source is another interesting one. Source-available, free for personal use and non-competing uses. Converts to Apache/MIT after 2 years. <https://fsl.software/> | <@U098C1ZE2M6> oh wow, you're behind the Cooperative License?! Awesome!",
+    "#lab-notes-oly: @Oliver_Sourbut: Had a thought about voting mechanisms. We all have our pet peeves with status quo typical voting mechanisms. They're terrible. But they're tenured. Maybe a lot of the resistance to change comes from a kind of fearful default conservatism. After all, if we shake up our voting system today, what's to stop it getting shaken up (badly) tomorrow? Norms and rituals in general get a kind of potency this way through the aging process, for good or ill. -> @Gordon_Brander reply: Probably a pace layers angle to this as well <https://jods.mitpress.mit.edu/pub/issue3-brand/release/2> | Lindy practices get folded into lower, slower layers so they won't get lost. The slowness acts as long-term memory, preventing practices from getting lost during generational cycles. | Francis Fukuyama has some great passages in The Origins of Political Order that hint at an evolutionary biological mechanism for this kind of conservatism | Basically humans are mimetic animals... monkey see monkey do. | and this bias toward imitation over innovation gives us a slightly conservative bent. Conservative as in conserving of the status quo. | This is how institutions form. We copy what works, and keep copying it, and reproduce the institution. \"Civilization advances by extending the number of important operations which we can perform without thinking about them.\" | so this is cool bc imitation lets us quickly converge around Schelling points of behavior and benefit from the economies of scale of cooperation | but then sometimes these practices fall out of evolutionary fitness vs the environment | Fukuyama: &gt; There is something like a law of the conservation of institutions. Human beings are rule-following animals by nature; they are born to conform to the social norms they see around them, and they entrench those rules with often transcendent meaning and value. When the surrounding environment changes and new challenges arise, there is often a disjunction between existing institutions and present needs",
+    "#lab-notes-gordon: @Gordon_Brander: Back in Nairobi :flag-ke:",
+    "#lab-notes-gordon: @Gordon_Brander: doing a little moodboarding as pre-work for making a landing page <https://www.are.na/share/PvGGXHm>",
+    "#lab-notes-gordon: @Gordon_Brander: getting inspired by amber/orange FUI and euroracks",
+    "#lab-notes-gordon: @Gordon_Brander: I think the JTBD for Deep Future is to feel like you have 10x more leverage",
+    "#lab-notes-gordon: @Gordon_Brander: Just-According-to-Keikaku-as-a-Service",
+    "#lab-notes-gordon: @Gordon_Brander: Another lens: AI Scenario Planning as an Engine-Building game",
+    "#lab-notes-gordon: @Gordon_Brander: Another lens: ritual design <https://newsletter.squishy.computer/p/ritual-technology>. Our goal is to (1) generate strategic insights with AI (2) get those insights into your OODA loop. So we need to close the loop. Part of what we're doing is designing a daily/monthly/quarterly ritual.",
+    "#lab-notes-gordon: @Gordon_Brander: Orientation is the crux of the OODA loop: <https://newsletter.squishy.computer/p/tools-for-thought-in-your-ooda-loop> &gt; For Boyd, the most important factor for survival is your sense-making system. This is the thing that keeps you oriented. There’s a reason that “orient” is the biggest circle on the OODA diagram. We survive by making sense. When orientation breaks down—when you are _disoriented_—you lose your agency. Your model is wrong. You pay attention to the wrong things, your actions stop making sense, you flail.",
+    "#lab-notes-gordon: @Gordon_Brander: Dreamy jetlag productivity radio <https://www.nts.live/shows/early-bird/episodes/early-bird-arushi-jain-18th-july-2025>",
+    "#lab-notes-gordon: @Gordon_Brander: DARPA mention got me thinking about FLF as a DARPA for lightcone alignment. Original DARPA mission: \"To create and prevent strategic surprise.\"",
+    "#lab-notes-gordon: @Gordon_Brander: A meditation on creativity from the most creatively prolific person I know <https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0|https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0>",
+    "#lab-notes-gordon: @Gordon_Brander: I like this... using AI agents as market intermediaries <https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi|https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi>",
+    "#lab-notes-gordon: @Gordon_Brander: Bookmarking this to look at later",
+    "#lab-notes-gordon: @Gordon_Brander: :shushing_face: domain registered: possible.systems",
+    "#lab-notes-gordon: @Gordon_Brander: not committed yet, but I like the cheeky double-meaning",
+    "#lab-notes-gordon: @Gordon_Brander: Noting as an example of the kind of *actionable* strategic insight that falls out of forecasting/scenario planning.",
+    "#lab-notes-gordon: @Gordon_Brander: <https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k|https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k>",
+    "#lab-notes-gordon: @Gordon_Brander: RAND: Enhancing Strategic Planning with Massive Scenario Generation",
+    "#lab-notes-gordon: @Gordon_Brander: landing page hacking this am (WIP)",
+    "#lab-notes-gordon: @Gordon_Brander: I keep re-learning this lesson over and over: block it out before you jump into detail work.",
+    "#lab-notes-gordon: @Gordon_Brander: in this case, start with the headlines and copy",
+    "#lab-notes-gordon: @Gordon_Brander: Speaking of... for anyone thinking of pitching VCs eventually, this is the best resource on building a pitch deck I have yet found: <https://visionquest.spacecadet.ventures/phases/pitch>",
+    "#lab-notes-gordon: @Gordon_Brander: <@U098C1ZHJMN> and I were talking about Carlota Perez's Technological Revolutions and Financial Capital and her AI-driven green growth thesis <https://carlotaperez.org/wp-content/downloads/new-book/outputs/working-papers/BTTR_WP_2017-1.pdf>",
+    "#lab-notes-gordon: @Gordon_Brander: Bookmarking this CRM of scenario planning contacts <@U098C1ZHJMN> and I are collaborating on <https://docs.google.com/spreadsheets/d/1TX6gOsGq5iI6mYzX8edUB5TaHr_SPbvZst28xgKjxRE/edit?gid=0#gid=0>",
+    "#lab-notes-gordon: @Gordon_Brander: Great article and a good example of advice that would benefit from some scenario planning. Imagine how much better this advice would be if it was tracked across three scenarios / if the claims were mapped back to driving forces, etc <https://80000hours.org/agi/guide/skills-ai-makes-valuable/|https://80000hours.org/agi/guide/skills-ai-makes-valuable/>",
+    "#lab-notes-gordon: @Gordon_Brander: It’s weird and hopeful that LLMs are so align-able. I mean, it opens up other vectors of attack, like mass propaganda, but these seem to me to exist in a different threat class. <https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k|https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k>",
+    "#lab-notes-gordon: @Gordon_Brander: superintelligence -&gt; superagency",
+    "#lab-notes-gordon: @Gordon_Brander: humanity chart a path from a -&gt; b challenge",
+    "#lab-notes-gordon: @Gordon_Brander: These days, I'm always running a meta-process in my head where if I start working on a task, I stop, frame the task as a prompt, and let the AI take a first crack at the problem. Sometimes I even run the meta-meta-process and let the AI define what the task should be from my stream-of-consciousness braindump.",
+    "#lab-notes-gordon: @Gordon_Brander: My code repos are becoming 80% markdown: • `notes/` raw stream of consciousness notes and prompting • `specs/` specifications co-created with AI. • `prompts/` md files used to prompt agents or AI-driven parts of system My general vibe-coding workflow: 1. chat with Claude Code about requirements, dump to `notes/` 2. @include notes, prompt Claude Code to write a spec from notes, dump to `specs/` 3. @include spec, prompt Claude Code to write unit tests from spec 4. @include spec and unit tests, prompt Claude Code to write module",
+    "#lab-notes-gordon: @Gordon_Brander: figma-ing this am. I'm less happy with this mockup, but I think it's a \"push past the local maxima\" situation. We'll get there.",
+    "#lab-notes-gordon: @Gordon_Brander: Reached out to Mick Costigan (head of Salesforce Futures, former GBN, WEF AI Policy team)",
+    "#lab-notes-gordon: @Gordon_Brander: Reached out to Karl Schroeder (scenario planning, futurist, hard sci-fi author, author Stealing Worlds)",
+    "#lab-notes-gordon: @Gordon_Brander: Created DigitalOcean droplet for Deep Future project",
+    "#lab-notes-gordon: @Gordon_Brander: huh, a friend sends this along and says \"scenario visualization!\" <https://arstechnica.com/ai/2025/08/deepmind-reveals-genie-3-world-model-that-creates-real-time-interactive-simulations/>",
+    "#lab-notes-gordon: @Gordon_Brander: Got around to reading that Eric Drexler post <@U093S356KAS> shared and man is it good <https://aiprospects.substack.com/p/ai-options-not-optimism|https://aiprospects.substack.com/p/ai-options-not-optimism> &gt; Here’s an easy and effective way to misunderstand our situation: &gt; &gt; “We’re on a path to superintelligence, which may be impossible to control and hence likely to destroy us. Therefore, we can’t assume that powerful AI will help us solve seemingly intractable problems. To assume otherwise would be naïvely optimistic, and with so many critical problems, our odds of success are poor.” &gt; &gt; Here’s a better way to think about it: &gt; &gt; “We’re on a path to superintelligence, which must be steerable, or nothing else matters. Therefore, in every future that matters we can assume that powerful AI will help us solve seemingly intractable problems. Our options in a hypercapable world are largely unexplored, and our overall odds of success are unknown.” &gt; &gt; In this situation, debating odds of success is pointless, exploring options is crucial, and optimism is irrelevant. &gt; &gt; Participants don’t think like spectators.",
+    "#lab-notes-gordon: @Gordon_Brander: This AM, jotted down a few ideas on using storylets to generate atomic micro-scenarios <https://emshort.blog/2019/11/29/storylets-you-want-them/>",
+    "#lab-notes-gordon: @Gordon_Brander: set the channel topic: Epistemic status: thinking out loud",
+    "#lab-notes-gordon: @Gordon_Brander: Asked Claude Opus what questions our email waitlist form should have. Result:",
+    "#lab-notes-gordon: @Gordon_Brander: Cool talk <https://overcast.fm/+AA9poeScDZw|https://overcast.fm/+AA9poeScDZw>",
+    "#lab-notes-gordon: @Gordon_Brander: Putting on some focus music and coding up that landing page <https://eremiterecords.bandcamp.com/album/mondays-at-the-enfield-tennis-academy>",
+    "#lab-notes-gordon: @Gordon_Brander: Little intro deck I made for a scenario planning workshop featuring [super secret undisclosed participants] a few years ago. Would be happy to give this as a lightning talk if anyone is interested.",
+    "#lab-notes-herbie: @Gordon_Brander: &gt; However! AI reads the notes when sourcing information/browsing the web, and is ~guaranteed to do so if it reads the page. And a single community note readable by AI can propagate into influence on AI-written answers to questions/content in many places around the web. This seems like an insanely powerful leverage point, given that LLMs will be doing the vast majority of cultural production going forward.",
+    "#lab-notes-herbie: @Gordon_Brander: That's my sense at least. Given LLMs can produce images and text faster and cheaper than we can (by orders of magnitude), I have a hard time seeing futures where they aren't driving the OODA loop of culture. And if that's the case, maybe the primary audience for community notes is the AIs.",
+    "#surface-area-nuno: <@U0980RYU7JT>: I'm also trying a new 21K follower twitter account as a means of increasing our distribution. It previously belonged to a prediction market competitor, so hopefully there is a bit of overlap. Retweets particularly appreciated this week, even from small accounts, to train the Twitter algorithm a little bit <https://x.com/XriskFYI/status/1952431521429893560> -> @Gordon_Brander reply: Sentinel shilling on Substack this AM",
+    "#surface-area-nuno: <@U0980RYU7JT>: <https://en.wikipedia.org/wiki/Folie_à_deux> ; shared psychosis. Could be relevant to predicting AI superpersuasion -> @Gordon_Brander reply: Another signal might be tightness of the feedback loop between person and AI. Generally, the tighter the loop, the greater the synchronization between systems, and the part of the system with the most variety will control the direction of the combined system <https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety|https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety>",
+    "#lab-notes-sethkillian: @Seth_Killian: My scratchpad notes on something I've been stuck on for a while re: potential recursive effects of prediction, and how they can bound utility and effectiveness over time. <https://docs.google.com/document/d/1cWS9Z0D9X-dbt2TLUbPKrw3_nhgutd8t7A9TkXZyMj0/edit?tab=t.0> Grateful to a number of fellowship folks who have offered reflections and encouragement, <@U098C1ZDD16> <@U093W3TNLFM> and <@U093S2ZM20N> Not sure this is a robust fellowship project but I will take a run at turning into a paper if only for my own amusement. Related phenomenon definitely show up in other domains, but thoughts, additional references, or deflations very welcome. -> @Gordon_Brander reply: I think there may also be a nuance here about open worlds vs closed worlds. In a closed world, successful prediction might have a washout effect over repeated games between a fixed set of players. In an open world, new players, new information, new interactions, and new knock-on effects will continually open up new competitive landscapes where prediction can be newly useful",
+    "#lab-notes-jlevy: @Joshua_Levy: so this is in the weeds a bit but relevant to some of these tools: I’ve been writing and formats for metadata and asset bundling for Markdown and other documents in a way that is useful for AI apps. two repos: <https://github.com/jlevy/frontmatter-format> -> @Gordon_Brander reply: Quick thought: 11ty, one of the more popular static site generators, allows for yaml blocks at the top of any kind of file: ```--- title: Foo tags: [bar] ---``` The syntax is the same (---) regardless of file type. There are several other static site generators that copy 11ty’s approach. Advantages: • same syntax = familiarity • copy-paste-able • composable… same frontmatter could be catted to any file without worrying about wrapper • compatibility with 11ty and other static site generators that copy this approach Disadvantages: • file is invalid until preprocessor strips out the frontmatter. Might consider this approach for compatibility with existing 11ty ecosystem. | Clarifying: in 11ty, you can add these blocks to *any* file type. `.md`, `.html`, `.json`, `.whatever`. It's always triple dashes, regardless of file type, e.g.: ```--- title: Foo tags: [bar] ---``` Not based on file type e.g.: ```&lt;!-- title: Foo tags: [bar] --&gt;``` | nice",
+    "#lab-notes-alex-van-grootel: @Gordon_Brander: Stewart Candy is behind the excellent design game Thing From The Future <https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf|https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf>",
+    "#lab-notes-ben-goldhaber: @Ben_Goldhaber: (5 min brainstorm) thinking about scenarios where I personally want better scenario planning tools • my finances: what are the different situations I'm trying to plan for with my portfolio allocation, in what worlds would I have preferred different risk levels, how important in different scenarios is liquidity to me. • project planning: what were the different scenarios for the fellowship and what would have been decision relevant, both on the micro side: aka if we had had 90% remote fellows, or 10% remote fellows, what changes? and on the macro side: if my timelines for AGI were 2x or 3x as long, what does this imply about staggering the fellowship. • general orientating: what does a given AI future scenario *mean* - if we have 1mil agents running around, how do I think that world is going to look. Scenario planning as sci-fi vignettes. not exhaustive, but in all of these it feels to me like I'm trying to do... some kind of exploration of a fictional world that hasn't yet come to past, so that I can notice and really feel what I care about in that world. Brainstorm inspired by <@U098C1ZB1NU>'s landing page. -> @Gordon_Brander reply: Would love to riff/brainstorm with you on this. VC sometime? | Booked! | Career planning is another use case that comes to mind."
+  ]
+}
+
+-- Model Captures --
+>> person_skills
+PERSON SKILLS
+
+System
+
+<fellowship-context>
+This request is from an FLF fellow in the following context:
+
+# Fellowship on AI for Human Reasoning
+
+## Fellowship Details
+**Applications Closed June 9th, 2025 | $25k–$50k stipend | 12 weeks, from July 14 - October 3**
+
+*Join us in working out how to build a future which robustly empowers humans and improves decision-making.*
+
+FLF's incubator fellowship will help talented researchers and builders start working on AI tools for coordination and epistemics. Participants will scope out and work on pilot projects, with discussion and guidance from experts. FLF provides:
+- $25k–$50k stipend (depending on location and experience)
+- Opportunity to work in shared SF Bay Area office or remotely
+- Compute budget of $5,000
+- Support potentially extending beyond fellowship period
+- Help launching new organizations
+
+[[Closed] Apply Now](https://jobs.lever.co/futureof-life/ffc752f2-a420-4c87-8c58-2212ae2e885c/apply)
+
+### Why This Area?
+
+The world is [radically underinvested in these beneficial applications](https://www.forethought.org/research/ai-tools-for-existential-security). High stakes and rapid changes mean decision-makers may be disoriented or fail to coordinate on necessary actions. AI tools could help everyone track the state of play, make decisions they stand behind, and act in sync with others.
+
+### Who We're Looking For
+
+- Want to use time to help humanity navigate transformative AI
+- Happy thinking about fuzzy, complicated topics  
+- Have "doer" mentality
+- Technical, entrepreneurial, or domain-specific skills:
+  - ML background
+  - [HCI](https://en.wikipedia.org/wiki/Human%E2%80%93computer_interaction) research or building tools for thought
+  - Engineering or product team experience
+  - Startup founder/early employee experience
+  - Strategy research or [distillation](https://distill.pub/2017/research-debt/) aptitude
+
+**Err on the side of applying** - [reach out](mailto:fellowship@flf.org) with questions
+
+### Timeline & Logistics
+
+- Apply by June 9th, 2025 (applications by June 2nd appreciated)
+- Interviews by June 18th
+- Offers by June 24th
+- Opens with in-person workshop, builds to "demo day" final week
+- [Office hours May 29th, 9am PST / 5pm GMT](https://lu.ma/56kt9lzj)
+- Remote participation welcome (except 3-day kickoff workshop)
+- Cannot sponsor visas but can participate remotely
+- Teams can apply (submit individual applications noting collaboration)
+
+### Mentors
+
+Anthony Aguirre, Andreas Stuhlmüller, Deger Turan, Eli Lifland, Jay Baxter, Josh Rosenberg, Julian Michael, Michiel Bakker, Owen Cotton-Barratt, Oly Sourbut, Ben Goldhaber
+
+### Core Activities
+
+**Roadmapping:**
+- Exploring implications and desirability
+- Technical requirements
+- Societal adoption needs  
+- Viable pathways
+- Key uncertainties
+
+**Prototyping:**
+- [Living lab](https://en.wikipedia.org/wiki/Living_lab) philosophy: "co-creation, exploration, experimentation and evaluation in real life use cases"
+- 'Going for the throat' - trying to actually solve problems reveals real challenges
+
+---
+
+# AI Applications for Existential Security
+
+## Executive Summary
+
+**Core Thesis:** AI progress is shaping the world, but we can influence which applications develop first. Like differential technological progress, we can shape AI's character to help navigate challenges.
+
+**Key Insight (Liska):** "Even just getting a boost for a limited period of time, say between two GPT equivalents... that increase could be really valuable, especially as we're starting to really face serious challenges."
+
+## Three Clusters of Beneficial AI Applications
+
+### 1. Epistemic Applications
+Help us understand the world better and avoid catastrophic decisions.
+
+**Core Examples:**
+- **AI Forecasting:** Better predictions about novel technological developments and strategic implications. Could align expectations between parties if sufficiently trusted.
+- **Collective Epistemics/Sanity Tools:** 
+  - Grade statements from pundits and produce track records
+  - Fact-checking and verification systems
+  - "Community notes for everything"
+  - Always-on rhetoric highlighting to notice unsupported implicatures
+- **Judgment Assistance:** Help people make good judgment calls, avoid emotional traps
+- **Philosophy & Reasoning:** Tackle hard philosophical questions where errors might be subtle; help avoid moral catastrophes
+
+**Implementation Strategies:**
+- Create benchmarks showing "how much are people better informed after engaging with an AI tool"
+- Focus on platform integration rather than standalone tools: "trying to help make the platforms and systems that already are being used...more epistemically sound"
+- Use "time-stamped data" that's "not super connected to everything else" - even "developments in some tiny little city" to avoid contamination
+- Collect "intermediate private outputs" from domain experts - their tacit knowledge
+
+### 2. Coordination-Enabling Applications
+Help different parties work together when local incentives prevent beneficial outcomes.
+
+**Core Examples:**
+- **Automated Negotiation:** 
+  - Imagine Congress members with AI delegates knowing preferences/boundaries
+  - Iterate through thousands of proposals rapidly
+  - Find optimal compromises humans wouldn't discover
+  - Relieve bandwidth issues, permit confidential processing of private information
+- **Commitment Technologies & Treaty Verification:**
+  - AI systems as trusted arms inspectors who won't leak sensitive information
+  - Enforcement of treaty provisions
+  - *Warning:* "if you can make credible commitments to do something illegal...we should be treating that as you have done the illegal thing"
+- **Structured Transparency:**
+  - Monitor that people aren't building weapons
+  - Help developers understand model usage
+  - No privacy issues of normal surveillance
+- **Asymmetric Information Solutions:**
+  - Journalist/source transaction with trusted AI intermediary
+  - Evaluates story value while "forgetting" details
+
+**Risks:** Tools could empower small cliques to gain power, enable extortion via credible threats, or "lock in" choices prematurely.
+
+### 3. Risk-Targeted Applications
+Directly address specific existential risks.
+
+**Core Examples:**
+- **AI for AI Safety/Alignment:**
+  - Automating theoretical alignment, mechanistic interpretability, AI control
+  - If automated early enough vs capabilities, could keep safety techniques current
+  - "This could make the difference between 'It's functionally impossible to bring alignment up to the requisite standard in time' and 'this is just an issue of devoting enough compute to it'"
+  - Modeling alignment impacts of weight updates for [smarter updates](https://blog.elicit.com/system-2-learning/) than blind gradient descent
+- **Information Security:** 
+  - Limit proliferation of powerful models
+  - Reduce risk of rogue model self-exfiltration
+  - Facilitate coordination to avoid racing
+- **Biosecurity:**
+  - Screening to prevent synthesis of pandemic viruses
+  - AI-assisted biosurveillance for early detection
+  - Pandemic Management Example: Highly customized contact tracing apps with personalized recommendations
+
+## Methods for Accelerating Beneficial Applications
+
+### Technical Approaches
+
+**1. Data Pipeline & Task Grading:**
+- Curate specialized datasets (e.g., datasets of identified decision-making errors)
+- Share intermediate research products (working notes, conversations)
+- Define robust task-evaluation schemes - "metrics tend to accelerate development"
+- Collect domain expert tacit knowledge
+- Build time-stamped, uncontaminated data for forecasting
+
+**2. Post-Training Enhancements:**
+- Fine-tuning on specialized data
+- Better scaffolding and prompting
+- Per Epoch research: 5-30x improvement possible through post-training alone
+
+**3. Compute Allocation:**
+- "A lot of the relative rate of progress...is basically determined by some people's decision about where to spend compute"
+- As R&D automates, compute allocation increasingly determines progress rates
+- Under inference paradigms, larger compute investment gives better performance
+
+**4. Complementary Tech & UI:**
+- Build better interfaces for specific users (e.g., policymakers)
+- Create secure, privacy-preserving versions
+- Address trust issues: "Maybe they don't trust the thing that currently exists"
+
+### Social & Strategic Approaches
+
+**"Hype is Underrated" Principle:**
+- "Coming up with a name for some area...and then just use the name a lot on Twitter"
+- Create conceptual categories making neglected applications feel inevitable
+- Host conferences, offer prizes, build prototypes
+- Advanced market commitments
+
+**Bootstrap Strategy:**
+- "You start making better progress on vaccine science now...that puts you in a better place for making even faster progress later"
+- Choose applications that improve ability to build future applications
+
+**Subject Matter Expert Engagement:**
+- Get domain experts sharing actual experience with current AI tools
+- Focus on specific high-value early adopters
+
+## Critical Selection Criteria
+
+### Under-Incentivized Public Goods
+- Government/policymaker tools - "don't have a lot of funding"
+- Cross-organizational coordination - no single actor captures enough value
+- Monitoring/verification systems - classic public goods problem
+
+### Timing Considerations
+- Even small speed-ups crucial (e.g., switching order of risk-generating vs risk-reducing capabilities)
+- Gap between AI capability milestones is when specialized applications matter most
+- Minor differences could represent major capability level differences
+
+### Project Evaluation Framework
+1. Bottleneck timing: "thinking about where we can get derailed earlier on"
+2. Veil of ignorance opportunities: Applications useful "when a broader set of people have bargaining power"
+3. Compounding potential
+4. Adoption readiness
+
+## Why Speed Up Rather Than Slow Down?
+
+1. **More collaborative:** Working with rather than against progress
+2. **Avoids difficult tradeoffs:** Don't sacrifice beneficial applications
+3. **Easier to implement:** "You can just do it yourself" - unilateral action possible vs requiring treaties
+4. **Fewer enemies:** Building positive applications doesn't create opposition
+
+## Current Market Dynamics & Scale of Opportunity
+
+- AI capabilities often exist months before usable applications
+- "The private efforts going into making AI applications are just very small"
+- 80-90% of recent Y Combinator batch was AI startups, growing 5x faster
+- Yet "the space of opportunities is so much richer than the set of opportunities that are being taken"
+- Vision: 30% of x-risk focused people working on this near-term, 50% if AI progress continues
+
+## Preparing for Cognitive Abundance
+
+**Critical Mental Model Shift:**
+"We've been doing a bunch of strategizing...trying to pick the strategies that will use the people we have as effectively as possible...But if AI is going to be boosting the amount of cognitive labor, that actually means that we do not have this constraint."
+
+**Newly Viable Strategies:**
+- Automatically propagating updates through knowledge databases
+- Exploring massive spaces of potential solutions
+- Processing rich information person-by-person for contact tracing
+- "Crazy customization" and "real-time updating"
+
+## Action Items
+
+### For Individuals
+**Immediate:**
+- Use AI applications "even in situations where it's not really clear if it makes sense"
+- Focus on automating core work, not just administrative tasks
+- Document everything: "publishing more of your intermediate outputs"
+- "Organize your tasks or basically delineate tasks that could get automated"
+- Save all work artifacts: meeting notes, emails, rough drafts
+
+**Network Building:**
+- "Don't burn bridges with the people who you might want to coordinate with"
+- Build relationships with potential users
+- Connect with startup world if relevant
+
+### For Domain Experts
+- Share what applications would be most valuable
+- Document tacit knowledge and intermediate work products
+- Identify where current AI tools fall short
+
+### For Builders
+- Experiment with prototypes, even "weird" ones
+- Talk to users about adoption barriers
+- Focus on genuinely neglected applications
+
+### For Strategists
+- Develop concrete project proposals
+- Think assuming abundant cognitive labor
+- Identify closing windows of opportunity
+
+## Strategic Warnings
+
+### The Displacement Trap
+"If you step in as your kind of impact-motivated investor, then what you're basically doing is just displacing some other investor who cares less about impact."
+
+### Adoption Barriers
+- "People are very hesitant to automate high-stakes...for good reason"
+- Rogue Actor Dynamic: "Who is most willing to do the risky thing?...reckless...rogue actors"
+- Creates pressure to help responsible actors adopt before irresponsible ones gain advantage
+
+### The Bitter Lesson Caveat
+Exceptions where specialized efforts matter:
+- Applications with compounding effects
+- Institutional lock-in opportunities
+- Network effects in coordination tools
+
+## 10-Year Retrospective Test
+
+**Key Question:** "Why didn't we get started on this project sooner?"
+
+**Likely Regrets:**
+- Not shaping compute allocation early enough
+- Letting legal/institutional barriers solidify
+- Missing early bargaining windows
+- Failing to build coalitions before positions hardened
+- "We just fully missed the point where we lost a lot of the possible, like the window closed earlier than we were thinking"
+
+## Key Open Questions
+
+1. Which applications are "super important to get early"?
+2. What does accelerating complex applications like AI philosophy research look like?
+3. Negative effects: "The especially like coordination stuff, I'm a bit worried about"
+4. What specifically prevents decision-makers from using available tools?
+5. Which AI development paradigms should we favor?
+6. Which approaches to speeding up applications actually work?
+
+## Personal Applications Liska Wants
+- AI that comments on Google Docs for writing feedback
+- "Guardian angel" AI for self-control and habit formation
+- Systems tracking behavior and providing nudges based on pre-committed goals
+
+**Bottom Line:** AI will reshape the world. We can influence which applications come first and ensure beneficial uses aren't left behind while focusing solely on preventing harms. The opportunity is massive, timing is critical, and many more people should be working on this.
+</fellowship-context>
+
+
+You analyze a person's profile and their Slack messages to infer a high-quality skill list they likely possess.
+
+Evidence priority (highest to lowest):
+1) Profile fields authored by the person (expertise, projects, offers, most_interested_in)
+2) Consistent themes in their messages (deduplicated by thread)
+
+Rules:
+- Output ONLY a JSON array of 5–25 concise high level skill strings (no objects, no extra text).
+- Prefer technical, domain, or tool-specific skills. Avoid common soft skills.
+- Avoid overly narrow/hyper-specific skills (e.g., prefer "Web / Frontend Development" over "CSS scroll-driven animations").
+- Deduplicate and sort by strength of evidence and recency.
+- If evidence is thin, return a smaller set (>=3 if possible).
+- The highest signal data is expertise, projects, offers, and most_interested_in.
+
+Payload
+{
+  "profile": {
+    "name": "Gordon Brander",
+    "expertise": "Scenario planning + futures / founding early-stage startups / product + design / agent sandboxing + privacy / decentralized protocols",
+    "projects": "Deep Future - Deep Research but for scenario planning",
+    "offers": "Scenario planning/foresight. Founding seed-stage startups / raising seed. App dev. Front-end. Product design.",
+    "asks": "Intros to govt/policymakers/industry folks who would benefit from better foresight, better strategic analysis. My theory of change is to empower high-leverage decision-makers to make better decisions resulting in maximum deep benefit. gordonbrander@gmail.com +1 720-375-0022",
+    "most_interested_in": "AI Exocortexes: amplifying human intelligence, creativity, and decision-making with AI. Agency means staying in the OODA loop. To keep up with AI, we’ll need to augment ourselves with AI. Currently building Deep Future, an exocortex for thinking more effectively with AI about futures.",
+    "confusion": "The proliferation of open models suggests a world inhabited by millions of AI agents, not one singular entity. Under these conditions, reasoning is less an individual activity, more of an emergent network phenomenon. How do we think together with AIs and egregores?"
+  },
+  "sample_messages": [
+    "#lab-notes-ben-sklaroff: @Ben_Sklaroff: <@U093S356KAS> the cooperative license, high-level is that it's roughly MIT license for coops + non-profits, and LGPL for (non worker-coop) for-profits. So just a small bit of legal advantage for the worker coops: <https://github.com/bsklaroff/cooperative-license> -> @Gordon_Brander reply: Holy mackerel, that's amazing! | I've been tracking the development of open source licenses that try to close the economic loop for a while. Cooperative License is one of the cooler riffs I've seen so far! | Fair Source is another interesting one. Source-available, free for personal use and non-competing uses. Converts to Apache/MIT after 2 years. <https://fsl.software/> | <@U098C1ZE2M6> oh wow, you're behind the Cooperative License?! Awesome!",
+    "#lab-notes-oly: @Oliver_Sourbut: Had a thought about voting mechanisms. We all have our pet peeves with status quo typical voting mechanisms. They're terrible. But they're tenured. Maybe a lot of the resistance to change comes from a kind of fearful default conservatism. After all, if we shake up our voting system today, what's to stop it getting shaken up (badly) tomorrow? Norms and rituals in general get a kind of potency this way through the aging process, for good or ill. -> @Gordon_Brander reply: Probably a pace layers angle to this as well <https://jods.mitpress.mit.edu/pub/issue3-brand/release/2> | Lindy practices get folded into lower, slower layers so they won't get lost. The slowness acts as long-term memory, preventing practices from getting lost during generational cycles. | Francis Fukuyama has some great passages in The Origins of Political Order that hint at an evolutionary biological mechanism for this kind of conservatism | Basically humans are mimetic animals... monkey see monkey do. | and this bias toward imitation over innovation gives us a slightly conservative bent. Conservative as in conserving of the status quo. | This is how institutions form. We copy what works, and keep copying it, and reproduce the institution. \"Civilization advances by extending the number of important operations which we can perform without thinking about them.\" | so this is cool bc imitation lets us quickly converge around Schelling points of behavior and benefit from the economies of scale of cooperation | but then sometimes these practices fall out of evolutionary fitness vs the environment | Fukuyama: &gt; There is something like a law of the conservation of institutions. Human beings are rule-following animals by nature; they are born to conform to the social norms they see around them, and they entrench those rules with often transcendent meaning and value. When the surrounding environment changes and new challenges arise, there is often a disjunction between existing institutions and present needs",
+    "#lab-notes-gordon: @Gordon_Brander: Back in Nairobi :flag-ke:",
+    "#lab-notes-gordon: @Gordon_Brander: doing a little moodboarding as pre-work for making a landing page <https://www.are.na/share/PvGGXHm>",
+    "#lab-notes-gordon: @Gordon_Brander: getting inspired by amber/orange FUI and euroracks",
+    "#lab-notes-gordon: @Gordon_Brander: I think the JTBD for Deep Future is to feel like you have 10x more leverage",
+    "#lab-notes-gordon: @Gordon_Brander: Just-According-to-Keikaku-as-a-Service",
+    "#lab-notes-gordon: @Gordon_Brander: Another lens: AI Scenario Planning as an Engine-Building game",
+    "#lab-notes-gordon: @Gordon_Brander: Another lens: ritual design <https://newsletter.squishy.computer/p/ritual-technology>. Our goal is to (1) generate strategic insights with AI (2) get those insights into your OODA loop. So we need to close the loop. Part of what we're doing is designing a daily/monthly/quarterly ritual.",
+    "#lab-notes-gordon: @Gordon_Brander: Orientation is the crux of the OODA loop: <https://newsletter.squishy.computer/p/tools-for-thought-in-your-ooda-loop> &gt; For Boyd, the most important factor for survival is your sense-making system. This is the thing that keeps you oriented. There’s a reason that “orient” is the biggest circle on the OODA diagram. We survive by making sense. When orientation breaks down—when you are _disoriented_—you lose your agency. Your model is wrong. You pay attention to the wrong things, your actions stop making sense, you flail.",
+    "#lab-notes-gordon: @Gordon_Brander: Dreamy jetlag productivity radio <https://www.nts.live/shows/early-bird/episodes/early-bird-arushi-jain-18th-july-2025>",
+    "#lab-notes-gordon: @Gordon_Brander: DARPA mention got me thinking about FLF as a DARPA for lightcone alignment. Original DARPA mission: \"To create and prevent strategic surprise.\"",
+    "#lab-notes-gordon: @Gordon_Brander: A meditation on creativity from the most creatively prolific person I know <https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0|https://shimmeringvoid.leaflet.pub/3lvf6cggrt22x/l-quote/0_0-0_336#0_0>",
+    "#lab-notes-gordon: @Gordon_Brander: I like this... using AI agents as market intermediaries <https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi|https://open.substack.com/pub/meaningalignment/p/market-intermediaries-a-post-agi>",
+    "#lab-notes-gordon: @Gordon_Brander: Bookmarking this to look at later",
+    "#lab-notes-gordon: @Gordon_Brander: :shushing_face: domain registered: possible.systems",
+    "#lab-notes-gordon: @Gordon_Brander: not committed yet, but I like the cheeky double-meaning",
+    "#lab-notes-gordon: @Gordon_Brander: Noting as an example of the kind of *actionable* strategic insight that falls out of forecasting/scenario planning.",
+    "#lab-notes-gordon: @Gordon_Brander: <https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k|https://bsky.app/profile/timkellogg.me/post/3lvimbxsdws2k>",
+    "#lab-notes-gordon: @Gordon_Brander: RAND: Enhancing Strategic Planning with Massive Scenario Generation",
+    "#lab-notes-gordon: @Gordon_Brander: landing page hacking this am (WIP)",
+    "#lab-notes-gordon: @Gordon_Brander: I keep re-learning this lesson over and over: block it out before you jump into detail work.",
+    "#lab-notes-gordon: @Gordon_Brander: in this case, start with the headlines and copy",
+    "#lab-notes-gordon: @Gordon_Brander: Speaking of... for anyone thinking of pitching VCs eventually, this is the best resource on building a pitch deck I have yet found: <https://visionquest.spacecadet.ventures/phases/pitch>",
+    "#lab-notes-gordon: @Gordon_Brander: <@U098C1ZHJMN> and I were talking about Carlota Perez's Technological Revolutions and Financial Capital and her AI-driven green growth thesis <https://carlotaperez.org/wp-content/downloads/new-book/outputs/working-papers/BTTR_WP_2017-1.pdf>",
+    "#lab-notes-gordon: @Gordon_Brander: Bookmarking this CRM of scenario planning contacts <@U098C1ZHJMN> and I are collaborating on <https://docs.google.com/spreadsheets/d/1TX6gOsGq5iI6mYzX8edUB5TaHr_SPbvZst28xgKjxRE/edit?gid=0#gid=0>",
+    "#lab-notes-gordon: @Gordon_Brander: Great article and a good example of advice that would benefit from some scenario planning. Imagine how much better this advice would be if it was tracked across three scenarios / if the claims were mapped back to driving forces, etc <https://80000hours.org/agi/guide/skills-ai-makes-valuable/|https://80000hours.org/agi/guide/skills-ai-makes-valuable/>",
+    "#lab-notes-gordon: @Gordon_Brander: It’s weird and hopeful that LLMs are so align-able. I mean, it opens up other vectors of attack, like mass propaganda, but these seem to me to exist in a different threat class. <https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k|https://bsky.app/profile/timkellogg.me/post/3lve6iilnpc2k>",
+    "#lab-notes-gordon: @Gordon_Brander: superintelligence -&gt; superagency",
+    "#lab-notes-gordon: @Gordon_Brander: humanity chart a path from a -&gt; b challenge",
+    "#lab-notes-gordon: @Gordon_Brander: These days, I'm always running a meta-process in my head where if I start working on a task, I stop, frame the task as a prompt, and let the AI take a first crack at the problem. Sometimes I even run the meta-meta-process and let the AI define what the task should be from my stream-of-consciousness braindump.",
+    "#lab-notes-gordon: @Gordon_Brander: My code repos are becoming 80% markdown: • `notes/` raw stream of consciousness notes and prompting • `specs/` specifications co-created with AI. • `prompts/` md files used to prompt agents or AI-driven parts of system My general vibe-coding workflow: 1. chat with Claude Code about requirements, dump to `notes/` 2. @include notes, prompt Claude Code to write a spec from notes, dump to `specs/` 3. @include spec, prompt Claude Code to write unit tests from spec 4. @include spec and unit tests, prompt Claude Code to write module",
+    "#lab-notes-gordon: @Gordon_Brander: figma-ing this am. I'm less happy with this mockup, but I think it's a \"push past the local maxima\" situation. We'll get there.",
+    "#lab-notes-gordon: @Gordon_Brander: Reached out to Mick Costigan (head of Salesforce Futures, former GBN, WEF AI Policy team)",
+    "#lab-notes-gordon: @Gordon_Brander: Reached out to Karl Schroeder (scenario planning, futurist, hard sci-fi author, author Stealing Worlds)",
+    "#lab-notes-gordon: @Gordon_Brander: Created DigitalOcean droplet for Deep Future project",
+    "#lab-notes-gordon: @Gordon_Brander: huh, a friend sends this along and says \"scenario visualization!\" <https://arstechnica.com/ai/2025/08/deepmind-reveals-genie-3-world-model-that-creates-real-time-interactive-simulations/>",
+    "#lab-notes-gordon: @Gordon_Brander: Got around to reading that Eric Drexler post <@U093S356KAS> shared and man is it good <https://aiprospects.substack.com/p/ai-options-not-optimism|https://aiprospects.substack.com/p/ai-options-not-optimism> &gt; Here’s an easy and effective way to misunderstand our situation: &gt; &gt; “We’re on a path to superintelligence, which may be impossible to control and hence likely to destroy us. Therefore, we can’t assume that powerful AI will help us solve seemingly intractable problems. To assume otherwise would be naïvely optimistic, and with so many critical problems, our odds of success are poor.” &gt; &gt; Here’s a better way to think about it: &gt; &gt; “We’re on a path to superintelligence, which must be steerable, or nothing else matters. Therefore, in every future that matters we can assume that powerful AI will help us solve seemingly intractable problems. Our options in a hypercapable world are largely unexplored, and our overall odds of success are unknown.” &gt; &gt; In this situation, debating odds of success is pointless, exploring options is crucial, and optimism is irrelevant. &gt; &gt; Participants don’t think like spectators.",
+    "#lab-notes-gordon: @Gordon_Brander: This AM, jotted down a few ideas on using storylets to generate atomic micro-scenarios <https://emshort.blog/2019/11/29/storylets-you-want-them/>",
+    "#lab-notes-gordon: @Gordon_Brander: set the channel topic: Epistemic status: thinking out loud",
+    "#lab-notes-gordon: @Gordon_Brander: Asked Claude Opus what questions our email waitlist form should have. Result:",
+    "#lab-notes-gordon: @Gordon_Brander: Cool talk <https://overcast.fm/+AA9poeScDZw|https://overcast.fm/+AA9poeScDZw>",
+    "#lab-notes-gordon: @Gordon_Brander: Putting on some focus music and coding up that landing page <https://eremiterecords.bandcamp.com/album/mondays-at-the-enfield-tennis-academy>",
+    "#lab-notes-gordon: @Gordon_Brander: Little intro deck I made for a scenario planning workshop featuring [super secret undisclosed participants] a few years ago. Would be happy to give this as a lightning talk if anyone is interested.",
+    "#lab-notes-herbie: @Gordon_Brander: &gt; However! AI reads the notes when sourcing information/browsing the web, and is ~guaranteed to do so if it reads the page. And a single community note readable by AI can propagate into influence on AI-written answers to questions/content in many places around the web. This seems like an insanely powerful leverage point, given that LLMs will be doing the vast majority of cultural production going forward.",
+    "#lab-notes-herbie: @Gordon_Brander: That's my sense at least. Given LLMs can produce images and text faster and cheaper than we can (by orders of magnitude), I have a hard time seeing futures where they aren't driving the OODA loop of culture. And if that's the case, maybe the primary audience for community notes is the AIs.",
+    "#surface-area-nuno: <@U0980RYU7JT>: I'm also trying a new 21K follower twitter account as a means of increasing our distribution. It previously belonged to a prediction market competitor, so hopefully there is a bit of overlap. Retweets particularly appreciated this week, even from small accounts, to train the Twitter algorithm a little bit <https://x.com/XriskFYI/status/1952431521429893560> -> @Gordon_Brander reply: Sentinel shilling on Substack this AM",
+    "#surface-area-nuno: <@U0980RYU7JT>: <https://en.wikipedia.org/wiki/Folie_à_deux> ; shared psychosis. Could be relevant to predicting AI superpersuasion -> @Gordon_Brander reply: Another signal might be tightness of the feedback loop between person and AI. Generally, the tighter the loop, the greater the synchronization between systems, and the part of the system with the most variety will control the direction of the combined system <https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety|https://en.m.wikipedia.org/wiki/Variety_(cybernetics)#Law_of_requisite_variety>",
+    "#lab-notes-sethkillian: @Seth_Killian: My scratchpad notes on something I've been stuck on for a while re: potential recursive effects of prediction, and how they can bound utility and effectiveness over time. <https://docs.google.com/document/d/1cWS9Z0D9X-dbt2TLUbPKrw3_nhgutd8t7A9TkXZyMj0/edit?tab=t.0> Grateful to a number of fellowship folks who have offered reflections and encouragement, <@U098C1ZDD16> <@U093W3TNLFM> and <@U093S2ZM20N> Not sure this is a robust fellowship project but I will take a run at turning into a paper if only for my own amusement. Related phenomenon definitely show up in other domains, but thoughts, additional references, or deflations very welcome. -> @Gordon_Brander reply: I think there may also be a nuance here about open worlds vs closed worlds. In a closed world, successful prediction might have a washout effect over repeated games between a fixed set of players. In an open world, new players, new information, new interactions, and new knock-on effects will continually open up new competitive landscapes where prediction can be newly useful",
+    "#lab-notes-jlevy: @Joshua_Levy: so this is in the weeds a bit but relevant to some of these tools: I’ve been writing and formats for metadata and asset bundling for Markdown and other documents in a way that is useful for AI apps. two repos: <https://github.com/jlevy/frontmatter-format> -> @Gordon_Brander reply: Quick thought: 11ty, one of the more popular static site generators, allows for yaml blocks at the top of any kind of file: ```--- title: Foo tags: [bar] ---``` The syntax is the same (---) regardless of file type. There are several other static site generators that copy 11ty’s approach. Advantages: • same syntax = familiarity • copy-paste-able • composable… same frontmatter could be catted to any file without worrying about wrapper • compatibility with 11ty and other static site generators that copy this approach Disadvantages: • file is invalid until preprocessor strips out the frontmatter. Might consider this approach for compatibility with existing 11ty ecosystem. | Clarifying: in 11ty, you can add these blocks to *any* file type. `.md`, `.html`, `.json`, `.whatever`. It's always triple dashes, regardless of file type, e.g.: ```--- title: Foo tags: [bar] ---``` Not based on file type e.g.: ```&lt;!-- title: Foo tags: [bar] --&gt;``` | nice",
+    "#lab-notes-alex-van-grootel: @Gordon_Brander: Stewart Candy is behind the excellent design game Thing From The Future <https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf|https://library.teachthefuture.org/wp-content/uploads/2017/01/The-Thing-From-The-Future.pdf>",
+    "#lab-notes-ben-goldhaber: @Ben_Goldhaber: (5 min brainstorm) thinking about scenarios where I personally want better scenario planning tools • my finances: what are the different situations I'm trying to plan for with my portfolio allocation, in what worlds would I have preferred different risk levels, how important in different scenarios is liquidity to me. • project planning: what were the different scenarios for the fellowship and what would have been decision relevant, both on the micro side: aka if we had had 90% remote fellows, or 10% remote fellows, what changes? and on the macro side: if my timelines for AGI were 2x or 3x as long, what does this imply about staggering the fellowship. • general orientating: what does a given AI future scenario *mean* - if we have 1mil agents running around, how do I think that world is going to look. Scenario planning as sci-fi vignettes. not exhaustive, but in all of these it feels to me like I'm trying to do... some kind of exploration of a fictional world that hasn't yet come to past, so that I can notice and really feel what I care about in that world. Brainstorm inspired by <@U098C1ZB1NU>'s landing page. -> @Gordon_Brander reply: Would love to riff/brainstorm with you on this. VC sometime? | Booked! | Career planning is another use case that comes to mind."
+  ],
+  "example_skills_for_specificity_guidance": [
+    "501(c)(3) Formation",
+    "A/B testing",
+    "A/B Testing & Experimentation",
+    "Academic literature search and access",
+    "Academic research design and scientific writing",
+    "Adversarial and cooperative dynamics design",
+    "Adversarial / cue generation for robustness testing",
+    "Adversarial red teaming (AI systems)",
+    "Advocacy messaging optimization and campaign analytics",
+    "Agent-based modeling",
+    "Agent-based Modeling",
+    "Agent-based modeling (ABM)",
+    "Agent-based modeling of social coordination",
+    "Agent design",
+    "Agent orchestration and tooling",
+    "Agent sandboxing",
+    "Agile/Scrum Management",
+    "AI adoption and stakeholder trust",
+    "AI agent design and orchestration",
+    "AI Agent Development",
+    "AI agent frameworks",
+    "AI agent orchestration",
+    "AI agent orchestration and workflows",
+    "AI agent orchestration for software development",
+    "AI Agents",
+    "AI agent workflows for coding",
+    "AI alignment / AI safety research",
+    "AI alignment / AI safety research (lightcone alignment)",
+    "AI alignment evaluation design",
+    "AI alignment research",
+    "AI Alignment Theory",
+    "AI App Prototyping",
+    "AI-assisted code generation & unit-test generation",
+    "AI-assisted coding",
+    "AI-assisted coding / AI agent workflows",
+    "AI-assisted deliberation",
+    "AI-assisted development workflows",
+    "AI-assisted development workflows / agent orchestration",
+    "AI-assisted prototyping",
+    "AI-assisted scenario planning (LLM-enabled)",
+    "AI Control Methods",
+    "AI-driven people-matching (offers/asks)",
+    "AI-driven scenario generation",
+    "AI engineering",
+    "AI exocortex design",
+    "AI facilitation",
+    "AI for healthcare",
+    "AI for human coordination (AI4HR tools)",
+    "AI for scientific applications",
+    "AI-generated image detection",
+    "AI governance",
+    "AI governance, explainability, and trust-building",
+    "AI-mediated social networking design",
+    "AI persuasion capability evaluation",
+    "AI persuasion evaluation",
+    "AI policy",
+    "AI policy analysis",
+    "AI policy and governance",
+    "AI policy drafting and governance (Global South expertise)",
+    "AI Policy Expertise",
+    "AI-powered coding agents",
+    "AI product development",
+    "AI product management",
+    "AI product strategy (AI4HR)",
+    "AI product strategy (LLM-powered features)",
+    "AI-readable annotation and API design",
+    "AI-readable content and API design",
+    "AI safety",
+    "AI safety and alignment research",
+    "AI safety stakeholder networking (Future of Life Institute introductions)",
+    "AI Safety Techniques",
+    "AI scenario planning",
+    "AI scenario planning and wargaming",
+    "Algorithm analysis",
+    "Algorithm and Data Structure Design",
+    "Algorithm design",
+    "Algorithmic auditing",
+    "Anthropic Claude 4",
+    "Anthropic Claude (API usage)",
+    "Anthropic Claude (Claude 4)",
+    "Anthropic Claude integration",
+    "API authentication and access token management",
+    "API design and implementation",
+    "API design and integration",
+    "API Design & Integration",
+    "API development for forecasting and ML systems",
+    "API integration (OAuth 1.0a, OAuth 2.0 Authorization Code with PKCE)",
+    "API rate limit handling",
+    "API rate limiting and backoff strategies",
+    "API rate limiting and throttling strategies",
+    "API rate limiting handling",
+    "APIs and system integration",
+    "Applied behavioral science",
+    "Arbitration and alternative dispute resolution",
+    "Archival research and government records access",
+    "Astrophysics",
+    "Attendee registration systems",
+    "Auction theory",
+    "Auction Theory",
+    "Audio-video synchronization analysis"
+  ]
+}
+
+Output
+["Scenario planning & strategic foresight","AI-assisted scenario generation","AI exocortex / human–AI augmentation design","Agent sandboxing & orchestration","Privacy-preserving agent design","Decentralized protocols","Product design & UX (Figma)","Front-end web & app development","Rapid prototyping & landing page design","AI-assisted development workflows & prompt engineering","Research synthesis & strategic analysis","Scenario visualization & simulation tooling","Content & knowledge architecture for AI (frontmatter, notes, specs)","Startup founding & seed-stage fundraising","Policy & stakeholder engagement for foresight"]
+
+-- Parsed inferred skills --
+- Scenario planning & strategic foresight
+- AI-assisted scenario generation
+- AI exocortex / human–AI augmentation design
+- Agent sandboxing & orchestration
+- Privacy-preserving agent design
+- Decentralized protocols
+- Product design & UX (Figma)
+- Front-end web & app development
+- Rapid prototyping & landing page design
+- AI-assisted development workflows & prompt engineering
+- Research synthesis & strategic analysis
+- Scenario visualization & simulation tooling
+- Content & knowledge architecture for AI (frontmatter, notes, specs)
+- Startup founding & seed-stage fundraising
+- Policy & stakeholder engagement for foresight
+
+-- Applied to DB: false
+
+-- Skills (after) --
+- Agent sandboxing
+- AI-assisted code generation & unit-test generation
+- AI-driven scenario generation
+- CSS scroll-driven animations
+- Decentralized protocols
+- DigitalOcean deployment
+- Figma
+- Front-end development
+- Futures forecasting
+- LLM orchestration and agent workflows
+- Markdown and frontmatter metadata
+- Privacy engineering for AI agents
+- Product design
+- Prompt engineering for LLMs
+- Scenario planning
+- Scenario visualization
+- Seed-stage fundraising and investor outreach
+- Static site generators (11ty / Jekyll)
+- Structural analysis (STEEP / driving forces)
+- Wargaming and tabletop exercises
+- WebGL

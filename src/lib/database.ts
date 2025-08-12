@@ -217,6 +217,11 @@ export class Database {
     return result.rows;
   }
 
+  async getAllSkillNames(): Promise<string[]> {
+    const result = await this.query("SELECT skill FROM skills ORDER BY skill");
+    return result.rows.map((r: any) => r.skill as string);
+  }
+
   // Person-skill relationship methods
   async addPersonSkill(userId: string, skillId: number): Promise<void> {
     // Find the person's internal user_id using their slack_user_id
@@ -229,6 +234,17 @@ export class Database {
       "INSERT INTO person_skills (user_id, skill_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [person.user_id, skillId]
     );
+  }
+
+  async clearPersonSkills(userId: string): Promise<void> {
+    // Resolve to internal person id using either slack_user_id or user_id
+    const person = await this.getPerson(userId);
+    if (!person) {
+      throw new Error(`Person not found for user_id: ${userId}`);
+    }
+    await this.query("DELETE FROM person_skills WHERE user_id = $1", [
+      person.user_id,
+    ]);
   }
 
   async removePersonSkill(userId: string, skillId: number): Promise<void> {
@@ -454,7 +470,10 @@ export class Database {
            ORDER BY ts ASC, id ASC`,
           [channelId, rootTs]
         );
-        threadRows = threadRes.rows as Array<{ ts: string; text: string | null }>;
+        threadRows = threadRes.rows as Array<{
+          ts: string;
+          text: string | null;
+        }>;
       } catch {
         // Fallback: if thread query fails, just use the single message text
         threadRows = [{ ts: thisTs, text: row.text }];
@@ -481,15 +500,167 @@ export class Database {
       // If root not found (edge cases), fall back to this message's text
       if (!rootText) rootText = sanitize(row.text);
 
-      const joined = otherTexts.length > 0
-        ? `${rootText} -> ${otherTexts.join(" -> ")}`
-        : rootText;
+      const joined =
+        otherTexts.length > 0
+          ? `${rootText} -> ${otherTexts.join(" -> ")}`
+          : rootText;
 
       const line = `${channelPrefix}: ${joined}`.trim();
       if (line.length > 0) outputs.push(line);
     }
 
     return outputs;
+  }
+
+  /**
+   * Fetch ALL authored messages for a Slack user, deduplicated by thread root,
+   * and rendered with inline thread context, most recent threads first.
+   */
+  async getUserMessagesAll(slackUserId: string): Promise<string[]> {
+    if (!slackUserId) return [];
+
+    // Step 1: Distinct threads authored by user (root ts per thread), newest first by max(id)
+    const threads = await this.query(
+      `WITH authored AS (
+         SELECT id,
+                channel_id,
+                channel_name,
+                COALESCE(thread_ts, parent_ts, ts) AS root_ts
+         FROM slack_message
+         WHERE user_id = $1
+           AND text IS NOT NULL
+           AND COALESCE(subtype, '') <> 'channel_join'
+       )
+       SELECT a.channel_id,
+              max(a.channel_name) AS channel_name,
+              a.root_ts,
+              max(a.id) AS latest_id
+       FROM authored a
+       GROUP BY a.channel_id, a.root_ts
+       ORDER BY latest_id DESC`,
+      [slackUserId]
+    );
+
+    const sanitize = (t: string | null | undefined): string =>
+      (t || "")
+        .replace(/\s+/g, " ")
+        .replace(/[\u200B\u200C\u200D\uFEFF]/g, "")
+        .trim();
+
+    const formatChannel = (name: string | null | undefined): string => {
+      const n = (name || "").toString().trim();
+      if (!n) return "#unknown";
+      const withoutHash = n.replace(/^#/, "");
+      return `#${withoutHash}`;
+    };
+
+    const outputs: string[] = [];
+
+    // Cache display names for mentions
+    const nameCache = new Map<string, string>();
+    const getDisplayName = async (
+      sid: string | null | undefined
+    ): Promise<string | null> => {
+      if (!sid) return null;
+      if (nameCache.has(sid)) return nameCache.get(sid)!;
+      const res = await this.query(
+        `SELECT display_name FROM people WHERE slack_user_id = $1 LIMIT 1`,
+        [sid]
+      );
+      const n = (res.rows[0]?.display_name as string | undefined) || null;
+      if (n) nameCache.set(sid, n);
+      return n;
+    };
+    const mentionFor = async (
+      sid: string | null | undefined
+    ): Promise<string> => {
+      if (!sid) return "@unknown";
+      const dn = await getDisplayName(sid);
+      if (!dn) return `<@${sid}>`;
+      const handle = dn.trim().replace(/\s+/g, "_");
+      return `@${handle}`;
+    };
+
+    for (const row of threads.rows as Array<{
+      channel_id: string;
+      channel_name: string | null;
+      root_ts: string;
+    }>) {
+      const channelId = row.channel_id;
+      const channelName = row.channel_name;
+      const rootTs = row.root_ts;
+
+      // Load full thread context once per root
+      let threadRows: Array<{
+        ts: string;
+        text: string | null;
+        user_id: string | null;
+      }> = [];
+      try {
+        const threadRes = await this.query(
+          `SELECT ts, text, user_id
+           FROM slack_message
+           WHERE channel_id = $1
+             AND text IS NOT NULL
+             AND COALESCE(subtype, '') <> 'channel_join'
+             AND (
+               ts = $2 OR parent_ts = $2 OR thread_ts = $2
+             )
+           ORDER BY ts ASC, id ASC`,
+          [channelId, rootTs]
+        );
+        threadRows = threadRes.rows as Array<{
+          ts: string;
+          text: string | null;
+          user_id: string | null;
+        }>;
+      } catch {
+        // Ignore threads we can't load fully
+        continue;
+      }
+
+      const channelPrefix = formatChannel(channelName);
+      const root = threadRows.find((m) => m.ts === rootTs) || threadRows[0];
+      if (!root) continue;
+      const rootText = sanitize(root.text);
+      if (!rootText) continue;
+
+      // Replies authored by the target user in this thread
+      const myReplies = threadRows.filter(
+        (m) => m.user_id === slackUserId && m.ts !== rootTs
+      );
+
+      let line = "";
+      if (root.user_id === slackUserId) {
+        // User authored the root; include only the root line
+        const me = await mentionFor(slackUserId);
+        line = `${channelPrefix}: ${me}: ${rootText}`;
+      } else if (myReplies.length > 0) {
+        // User replied in this thread; show root author and user's reply chain
+        const rootAuthor = await mentionFor(root.user_id);
+        const me = await mentionFor(slackUserId);
+        const replyText = myReplies
+          .map((r) => sanitize(r.text))
+          .filter((t) => t.length > 0)
+          .join(" | ");
+        line = `${channelPrefix}: ${rootAuthor}: ${rootText} -> ${me} reply: ${replyText}`;
+      } else {
+        // No authored content by user; skip this thread
+        continue;
+      }
+
+      line = line.trim();
+      if (line.length > 0) outputs.push(line);
+    }
+
+    // Final de-dup pass in case different channels share identical content lines
+    const seen = new Set<string>();
+    const unique = outputs.filter((l) => {
+      if (seen.has(l)) return false;
+      seen.add(l);
+      return true;
+    });
+    return unique;
   }
 
   // Health check

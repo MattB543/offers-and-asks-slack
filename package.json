@@ -13,6 +13,8 @@
     "seed-skills": "ts-node src/scripts/seed-skills.ts",
     "weekly-prompt": "ts-node src/jobs/weekly-prompt.ts",
     "channel-summaries": "ts-node src/jobs/channel-summaries.ts",
+    "rebuild-person-skills": "ts-node src/jobs/rebuild-person-skills.ts",
+    "audit-person-skills": "ts-node src/scripts/audit-person-skill-rebuild.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

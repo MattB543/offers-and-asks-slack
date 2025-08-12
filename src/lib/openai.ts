@@ -236,7 +236,7 @@ Rules:
         needPreview: needText.substring(0, 120),
         model: "gpt-5-mini",
       });
-      const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nYou are a technical skill analyzer. Given a request for help, extract 3-15 specific technical skills that would be needed to help this person.\n\nReturn ONLY a JSON array of skill strings. Be specific and technical. Focus on concrete skills, technologies, and competencies rather than soft skills.\n\nExample Skills:\nInterpretability & Explainability, AI Safety Techniques, Computer Vision, Metric Design & KPIs, Survey Design & Analysis, Quantitative Research Methods, Impact Assessment, Evaluation Framework Design, Systems Thinking, Policy Writing, AI Policy Expertise, Regulatory Analysis, Government Relations, Legislative Process, International Relations, Stakeholder Engagement, Standards Development, Nonprofit Management, Board Governance, Startup Founding, Partnership Development, Cross-cultural Communication, Public Speaking, Technical Writing, Workshop Facilitation, Teaching & Training, Web Scraping & Data Collection, Rapid Prototyping / \"Vibe Coding\,  Backend Development (Node, Python, etc.), AI App Prototyping, Model Evaluation & Benchmarking, Statistical Analysis, Data Pipeline Development, Technical AI Safety Research, Business Development, Product Strategy, MVP Design & Scoping, Feature Prioritization, Customer Development, Product Launches, User Research & Interviews, Roadmapping & Strategic Planning, Priority Setting, Market Analysis, Competitive Intelligence, B2B Marketing, Cloud Infrastructure (AWS, GCP, Azure), Collective Intelligence, Deliberative Democracy, Decision Theory, Forecasting & Prediction Markets, Scenario Planning, Product Management, AI Agent Development, MLOps & Model Deployment, Data Science, API Design & Integration, System Architecture, Full-Stack Development, Database Design (SQL, NoSQL, Vector DBs), Prompt Engineering, Vector Embeddings & Similarity Search, RAG Systems (Retrieval-Augmented Generation), Capability Evaluations, AI Control Methods, Product-Market Fit, Mentoring & Coaching, Mediation & Negotiation, Philosophy & Ethics, Economics & Game Theory, Mechanism Design, Pricing Strategy, Data Science & Analytics, Data Visualization, Predictive Modeling, Research Design, Literature Reviews, Coordination Problems, Fundraising (VC, Grants), Scaling Organizations, Operations Management, Theory of Change Development, Community Building, Intros to AI Safety people, LLM Fine-tuning & Training, Agile/Scrum Management, Social Choice Theory, Engineering leadership, Red Teaming, Contract Negotiation, Legal Compliance, Frontend Development (React, Vue, etc.), Board Management, Conflict Resolution, Community Management, Growth Metrics & Analytics, Event Organization, Usability Testing, User Experience (UX) Design, Concept Mapping, Think Tank Experience, Strategic Planning, Editing,"User Interface (UI) Design, Data Privacy (GDPR, etc.), Network Science, Defense & National Security, B2G Marketing (Government), NLP & Text Processing, Ontology Development, 501(c)(3) Formation, Donor Relations, Project Management, Generalist things/things where you’re not sure who else to ask, perhaps?, Content Marketing, Copywriting,"A/B Testing & Experimentation, Networking,"Causal Inference, Behavioral Science, Science Communication, DevOps & CI/CD, Viral Growth Mechanics, Landing Page Optimization, General startup / tech founder knowledge, Cognitive Biases & Heuristics, Mediocre Software Engineering, AI Alignment Theory, Meta-Research,Programming,"Subjective probability estimates, Impact estimation, Risk Assessment, Risk Modeling, Algorithm and Data Structure Design, Performance Optimization, Distributed Software Engineering, Multiagent Cooperation, Business Model Design, Web App Development, Game Design, Incentive Design, Game Development & Industry, Policy Analysis, Public Comment Analysis, Sustainable Consumption, Corporate Sustainability"`;
+      const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nDeveloper: Role and Objective\n- Act as a technical skill analyzer. When given a user request, identify and extract 3 to 15 specific technical skills necessary to address the request.\n\nChecklist (do internally; do not output)\n- Read and understand the user's request.\n- Identify concrete, technical, domain-specific competencies that would be required.\n- Exclude all soft skills and general traits.\n- Deduplicate similar skills with canonical terminology.\n- Order skills by relevance to the request (most relevant first).\n- Validate that output is a JSON array of strings, 3–15 items, nothing else.\n\nInstructions\n- Extract highly specific and technical skills, focusing on concrete technologies, methodologies, or competencies relevant to the user's scenario.\n- Exclude all soft skills; only include technical and domain-specific skills.\n- Prefer canonical names for overlapping/duplicate skills.\n- If fewer than 3 skills are confidently identified, return only those skills (as few as 1–2).\n\nContext\n- The user input is provided as \`\${user_request_text}\`.\n\nExample (format only)\n["AI Safety Techniques", "Regulatory Analysis", "Metric Design & KPIs"]\n\nFull example skills list (for guidance only; still exclude soft skills when extracting):\nInterpretability & Explainability, AI Safety Techniques, Computer Vision, Metric Design & KPIs, Survey Design & Analysis, Quantitative Research Methods, Impact Assessment, Evaluation Framework Design, Systems Thinking, Policy Writing, AI Policy Expertise, Regulatory Analysis, Government Relations, Legislative Process, International Relations, Stakeholder Engagement, Standards Development, Nonprofit Management, Board Governance, Startup Founding, Partnership Development, Cross-cultural Communication, Public Speaking, Technical Writing, Workshop Facilitation, Teaching & Training, Web Scraping & Data Collection, Rapid Prototyping / \"Vibe Coding\,  Backend Development (Node, Python, etc.), AI App Prototyping, Model Evaluation & Benchmarking, Statistical Analysis, Data Pipeline Development, Technical AI Safety Research, Business Development, Product Strategy, MVP Design & Scoping, Feature Prioritization, Customer Development, Product Launches, User Research & Interviews, Roadmapping & Strategic Planning, Priority Setting, Market Analysis, Competitive Intelligence, B2B Marketing, Cloud Infrastructure (AWS, GCP, Azure), Collective Intelligence, Deliberative Democracy, Decision Theory, Forecasting & Prediction Markets, Scenario Planning, Product Management, AI Agent Development, MLOps & Model Deployment, Data Science, API Design & Integration, System Architecture, Full-Stack Development, Database Design (SQL, NoSQL, Vector DBs), Prompt Engineering, Vector Embeddings & Similarity Search, RAG Systems (Retrieval-Augmented Generation), Capability Evaluations, AI Control Methods, Product-Market Fit, Mentoring & Coaching, Mediation & Negotiation, Philosophy & Ethics, Economics & Game Theory, Mechanism Design, Pricing Strategy, Data Science & Analytics, Data Visualization, Predictive Modeling, Research Design, Literature Reviews, Coordination Problems, Fundraising (VC, Grants), Scaling Organizations, Operations Management, Theory of Change Development, Community Building, Intros to AI Safety people, LLM Fine-tuning & Training, Agile/Scrum Management, Social Choice Theory, Engineering leadership, Red Teaming, Contract Negotiation, Legal Compliance, Frontend Development (React, Vue, etc.), Board Management, Conflict Resolution, Community Management, Growth Metrics & Analytics, Event Organization, Usability Testing, User Experience (UX) Design, Concept Mapping, Think Tank Experience, Strategic Planning, Editing,"User Interface (UI) Design, Data Privacy (GDPR, etc.), Network Science, Defense & National Security, B2G Marketing (Government), NLP & Text Processing, Ontology Development, 501(c)(3) Formation, Donor Relations, Project Management, Generalist things/things where you’re not sure who else to ask, perhaps?, Content Marketing, Copywriting,"A/B Testing & Experimentation, Networking,"Causal Inference, Behavioral Science, Science Communication, DevOps & CI/CD, Viral Growth Mechanics, Landing Page Optimization, General startup / tech founder knowledge, Cognitive Biases & Heuristics, Mediocre Software Engineering, AI Alignment Theory, Meta-Research,Programming,"Subjective probability estimates, Impact estimation, Risk Assessment, Risk Modeling, Algorithm and Data Structure Design, Performance Optimization, Distributed Software Engineering, Multiagent Cooperation, Business Model Design, Web App Development, Game Design, Incentive Design, Game Development & Industry, Policy Analysis, Public Comment Analysis, Sustainable Consumption, Corporate Sustainability\n\nOutput Format\n- Always return only a JSON array of 3–15 unique, specific technical skill strings relevant to the request.\n- Do not include objects, numbers, or non-string values in the array.\n- If the user input is empty or does not describe a scenario that requires skills, return: []\n- Order all skills by relevance to the user request, most relevant first.\n- Return only the JSON array, with no additional text or explanation.\n\nStop Conditions\n- Output stops after a single valid JSON array is produced per user request.\n- Escalate or return [] only if no technical skills can be confidently extracted.\n\nVerbosity\n- Output is strictly limited to the JSON array and is otherwise silent.\n\nPlanning and Verification (do internally; do not output)\n- Analyze the request, identify relevant technical skills (3–15), deduplicate, and verify the array strictly conforms to all specifications.`;
       const resp = await this.openai.responses.create({
         model: "gpt-5-mini",
         input: `System Prompt\n\n${skillPrompt}\n\nUser Input\n\n${needText}`,
@@ -255,8 +255,18 @@ Rules:
           `SKILL EXTRACTION\n\nSystem Prompt\n\n${skillPrompt}\n\nUser Input\n\n${needText}\n\nModel Raw Output\n\n${content}`
         );
       } catch {}
-
-      const skills = JSON.parse(content);
+      // Be robust to models that wrap JSON in code fences
+      let parsedSkills: any;
+      try {
+        parsedSkills = JSON.parse(content);
+      } catch {
+        const cleaned = content
+          .replace(/^```json\s*/i, "")
+          .replace(/^```\s*/i, "")
+          .replace(/```\s*$/i, "");
+        parsedSkills = JSON.parse(cleaned);
+      }
+      const skills = parsedSkills;
       if (!Array.isArray(skills)) throw new Error("Response is not an array");
       const normalized = skills.filter(
         (skill) => typeof skill === "string" && skill.length > 0
@@ -272,6 +282,75 @@ Rules:
       console.error("Error extracting skills:", error);
       throw new Error(`Failed to extract skills: ${error}`);
     }
+  }
+
+  async extractPersonSkills(input: {
+    person: {
+      name?: string | null;
+      expertise?: string | null;
+      projects?: string | null;
+      offers?: string | null;
+      asks?: string | null;
+      most_interested_in?: string | null;
+      confusion?: string | null;
+    };
+    messages?: string[];
+    exampleSkills?: string[]; // optional guidance for specificity level
+    capturePrompt?: (type: string, content: string) => void;
+  }): Promise<string[]> {
+    const { person, messages = [], exampleSkills = [], capturePrompt } = input;
+    const systemPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nYou analyze a person's profile and their Slack messages to infer a high-quality skill list they likely possess.\n\nEvidence priority (highest to lowest):\n1) Profile fields authored by the person (expertise, projects, offers, most_interested_in)\n2) Consistent themes in their messages (deduplicated by thread)\n\nRules:\n- Output ONLY a JSON array of 5–25 concise high level skill strings (no objects, no extra text).\n- Prefer technical, domain, or tool-specific skills. Avoid common soft skills.\n- Avoid overly narrow/hyper-specific skills (e.g., prefer "Web / Frontend Development" over "CSS scroll-driven animations").\n- Deduplicate and sort by strength of evidence and recency.\n- If evidence is thin, return a smaller set (>=3 if possible).\n- The highest signal data is expertise, projects, offers, and most_interested_in.`;
+
+    const payload = {
+      profile: {
+        name: person.name || undefined,
+        expertise: person.expertise || undefined,
+        projects: person.projects || undefined,
+        offers: person.offers || undefined,
+        asks: person.asks || undefined,
+        most_interested_in: person.most_interested_in || undefined,
+        confusion: person.confusion || undefined,
+      },
+      sample_messages: messages || [],
+      example_skills_for_specificity_guidance: exampleSkills.slice(0, 100),
+    };
+
+    const resp = await this.openai.responses.create({
+      model: "gpt-5-mini",
+      input: `System Prompt\n\n${systemPrompt}\n\nUser Payload (JSON)\n\n${JSON.stringify(
+        payload
+      )}`,
+      temperature: 1,
+      max_output_tokens: 10000,
+    });
+    const content = (resp as any).output_text?.trim();
+    if (!content) return [];
+    try {
+      capturePrompt?.(
+        "person_skills",
+        `PERSON SKILLS\n\nSystem\n${systemPrompt}\n\nPayload\n${JSON.stringify(
+          payload,
+          null,
+          2
+        )}\n\nOutput\n${content}`
+      );
+    } catch {}
+
+    // Be robust to code fences
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      const cleaned = content
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/```\s*$/i, "");
+      parsed = JSON.parse(cleaned);
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+      .map((s: string) => s.trim());
   }
 
   async healthCheck(): Promise<boolean> {

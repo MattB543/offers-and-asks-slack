@@ -475,9 +475,28 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
 
   // Lightweight CORS for /api routes (optional)
   if (process.env.CORS_ALLOW_ORIGIN || process.env.ENABLE_CORS === "true") {
-    const allowOrigin = process.env.CORS_ALLOW_ORIGIN || "*";
+    const normalizeOrigin = (o: string) => o.replace(/\/$/, "");
+    const rawAllowed = (process.env.CORS_ALLOW_ORIGIN || "*")
+      .split(",")
+      .map((s) => normalizeOrigin(s.trim()))
+      .filter((s) => s.length > 0);
+
     receiver.router.use("/api", (req, res, next) => {
-      res.header("Access-Control-Allow-Origin", allowOrigin);
+      const requestOrigin = normalizeOrigin(
+        ((req.headers["origin"] as string | undefined) || "").trim()
+      );
+      let originToAllow: string | undefined = undefined;
+
+      if (rawAllowed.length === 0 || rawAllowed.includes("*")) {
+        originToAllow = "*";
+      } else if (requestOrigin && rawAllowed.includes(requestOrigin)) {
+        originToAllow = requestOrigin;
+        res.header("Vary", "Origin");
+      }
+
+      if (originToAllow) {
+        res.header("Access-Control-Allow-Origin", originToAllow);
+      }
       res.header(
         "Access-Control-Allow-Headers",
         "Origin, X-Requested-With, Content-Type, Accept, Authorization"

@@ -39,9 +39,16 @@ export class EmbeddingService {
         length: text.length,
         model: "text-embedding-3-small",
       });
+      const normalized = (text ?? "").trim();
+      if (normalized.length === 0) {
+        console.log(
+          "🧠 [EmbeddingService] generateEmbedding: empty text after normalization; returning []"
+        );
+        return [];
+      }
       const response = await this.openai.embeddings.create({
         model: "text-embedding-3-small",
-        input: text,
+        input: normalized,
       });
       const embedding = response.data[0].embedding;
       console.log("🧠 [EmbeddingService] generateEmbedding: success", {
@@ -58,14 +65,28 @@ export class EmbeddingService {
   async generateMultipleEmbeddings(texts: string[]): Promise<number[][]> {
     try {
       const start = Date.now();
+      // Normalize inputs: trim whitespace, drop empties, and deduplicate
+      const normalized = Array.from(
+        new Set(
+          (texts || []).map((t) => (t ?? "").trim()).filter((t) => t.length > 0)
+        )
+      );
       console.log("🧠 [EmbeddingService] generateMultipleEmbeddings: start", {
-        count: texts.length,
-        firstPreview: texts[0]?.substring(0, 60),
+        count: (texts || []).length,
+        filtered: normalized.length,
+        firstPreview: normalized[0]?.substring(0, 60),
+        firstRawPreview: texts?.[0]?.substring(0, 60),
         model: "text-embedding-3-small",
       });
+      if (normalized.length === 0) {
+        console.log(
+          "🧠 [EmbeddingService] generateMultipleEmbeddings: no valid inputs after normalization; returning []"
+        );
+        return [];
+      }
       const response = await this.openai.embeddings.create({
         model: "text-embedding-3-small",
-        input: texts,
+        input: normalized,
       });
       const vectors = response.data.map((item) => item.embedding);
       console.log("🧠 [EmbeddingService] generateMultipleEmbeddings: success", {
@@ -180,6 +201,7 @@ Rules:
       // Use Responses API with gpt-5-mini
       const resp = await this.openai.responses.create({
         model: "gpt-5-mini",
+        reasoning: { effort: "low" },
         input: `System Prompt\n\n${systemPrompt}\n\nUser Content JSON\n\n${JSON.stringify(
           userContent
         )}`,
@@ -239,6 +261,7 @@ Rules:
       const skillPrompt = `${SKILL_EXTRACTION_CONTEXT}\n\nDeveloper: Role and Objective\n- Act as a technical skill analyzer. When given a user request, identify and extract 3 to 15 specific technical skills necessary to address the request.\n\nChecklist (do internally; do not output)\n- Read and understand the user's request.\n- Identify concrete, technical, domain-specific competencies that would be required.\n- Exclude all soft skills and general traits.\n- Deduplicate similar skills with canonical terminology.\n- Order skills by relevance to the request (most relevant first).\n- Validate that output is a JSON array of strings, 3–15 items, nothing else.\n\nInstructions\n- Extract highly specific and technical skills, focusing on concrete technologies, methodologies, or competencies relevant to the user's scenario.\n- Exclude all soft skills; only include technical and domain-specific skills.\n- Prefer canonical names for overlapping/duplicate skills.\n- If fewer than 3 skills are confidently identified, return only those skills (as few as 1–2).\n\nContext\n- The user input is provided as \`\${user_request_text}\`.\n\nExample (format only)\n["AI Safety Techniques", "Regulatory Analysis", "Metric Design & KPIs"]\n\nFull example skills list (for guidance only; still exclude soft skills when extracting):\nInterpretability & Explainability, AI Safety Techniques, Computer Vision, Metric Design & KPIs, Survey Design & Analysis, Quantitative Research Methods, Impact Assessment, Evaluation Framework Design, Systems Thinking, Policy Writing, AI Policy Expertise, Regulatory Analysis, Government Relations, Legislative Process, International Relations, Stakeholder Engagement, Standards Development, Nonprofit Management, Board Governance, Startup Founding, Partnership Development, Cross-cultural Communication, Public Speaking, Technical Writing, Workshop Facilitation, Teaching & Training, Web Scraping & Data Collection, Rapid Prototyping / \"Vibe Coding\,  Backend Development (Node, Python, etc.), AI App Prototyping, Model Evaluation & Benchmarking, Statistical Analysis, Data Pipeline Development, Technical AI Safety Research, Business Development, Product Strategy, MVP Design & Scoping, Feature Prioritization, Customer Development, Product Launches, User Research & Interviews, Roadmapping & Strategic Planning, Priority Setting, Market Analysis, Competitive Intelligence, B2B Marketing, Cloud Infrastructure (AWS, GCP, Azure), Collective Intelligence, Deliberative Democracy, Decision Theory, Forecasting & Prediction Markets, Scenario Planning, Product Management, AI Agent Development, MLOps & Model Deployment, Data Science, API Design & Integration, System Architecture, Full-Stack Development, Database Design (SQL, NoSQL, Vector DBs), Prompt Engineering, Vector Embeddings & Similarity Search, RAG Systems (Retrieval-Augmented Generation), Capability Evaluations, AI Control Methods, Product-Market Fit, Mentoring & Coaching, Mediation & Negotiation, Philosophy & Ethics, Economics & Game Theory, Mechanism Design, Pricing Strategy, Data Science & Analytics, Data Visualization, Predictive Modeling, Research Design, Literature Reviews, Coordination Problems, Fundraising (VC, Grants), Scaling Organizations, Operations Management, Theory of Change Development, Community Building, Intros to AI Safety people, LLM Fine-tuning & Training, Agile/Scrum Management, Social Choice Theory, Engineering leadership, Red Teaming, Contract Negotiation, Legal Compliance, Frontend Development (React, Vue, etc.), Board Management, Conflict Resolution, Community Management, Growth Metrics & Analytics, Event Organization, Usability Testing, User Experience (UX) Design, Concept Mapping, Think Tank Experience, Strategic Planning, Editing,"User Interface (UI) Design, Data Privacy (GDPR, etc.), Network Science, Defense & National Security, B2G Marketing (Government), NLP & Text Processing, Ontology Development, 501(c)(3) Formation, Donor Relations, Project Management, Generalist things/things where you’re not sure who else to ask, perhaps?, Content Marketing, Copywriting,"A/B Testing & Experimentation, Networking,"Causal Inference, Behavioral Science, Science Communication, DevOps & CI/CD, Viral Growth Mechanics, Landing Page Optimization, General startup / tech founder knowledge, Cognitive Biases & Heuristics, Mediocre Software Engineering, AI Alignment Theory, Meta-Research,Programming,"Subjective probability estimates, Impact estimation, Risk Assessment, Risk Modeling, Algorithm and Data Structure Design, Performance Optimization, Distributed Software Engineering, Multiagent Cooperation, Business Model Design, Web App Development, Game Design, Incentive Design, Game Development & Industry, Policy Analysis, Public Comment Analysis, Sustainable Consumption, Corporate Sustainability\n\nOutput Format\n- Always return only a JSON array of 3–15 unique, specific technical skill strings relevant to the request.\n- Do not include objects, numbers, or non-string values in the array.\n- If the user input is empty or does not describe a scenario that requires skills, return: []\n- Order all skills by relevance to the user request, most relevant first.\n- Return only the JSON array, with no additional text or explanation.\n\nStop Conditions\n- Output stops after a single valid JSON array is produced per user request.\n- Escalate or return [] only if no technical skills can be confidently extracted.\n\nVerbosity\n- Output is strictly limited to the JSON array and is otherwise silent.\n\nPlanning and Verification (do internally; do not output)\n- Analyze the request, identify relevant technical skills (3–15), deduplicate, and verify the array strictly conforms to all specifications.`;
       const resp = await this.openai.responses.create({
         model: "gpt-5-mini",
+        reasoning: { effort: "low" },
         input: `System Prompt\n\n${skillPrompt}\n\nUser Input\n\n${needText}`,
         temperature: 1,
         max_output_tokens: 10000,
@@ -317,6 +340,7 @@ Rules:
 
     const resp = await this.openai.responses.create({
       model: "gpt-5-mini",
+      reasoning: { effort: "low" },
       input: `System Prompt\n\n${systemPrompt}\n\nUser Payload (JSON)\n\n${JSON.stringify(
         payload
       )}`,
@@ -417,6 +441,7 @@ Rules:
 
     const resp = await this.openai.responses.create({
       model: "gpt-5-mini",
+      reasoning: { effort: "low" },
       input: `System Prompt\n\n${systemPrompt}\n\nUser Payload\n\n${JSON.stringify(
         userPayload
       )}`,
@@ -544,6 +569,7 @@ export class ChannelSummarizerService {
 
     const response = await this.openai.responses.create({
       model: "gpt-5-mini",
+      reasoning: { effort: "low" },
       input: `System Prompt\n\n${systemPrompt}\n\nUser Prompt\n\n${userPrompt}`,
       temperature: 1,
       max_output_tokens: 10000,

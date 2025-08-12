@@ -44,6 +44,16 @@ export class HelperMatchingService {
         sample: extractedSkills.slice(0, 10),
       });
 
+      if (extractedSkills.length === 0) {
+        console.warn(
+          "⚠️  [HelperMatchingService] no skills extracted; will skip skill embeddings and similarity-by-skill queries",
+          {
+            needLength: needText.length,
+            needPreview: needText.substring(0, 120),
+          }
+        );
+      }
+
       // Generate embeddings for each extracted skill
       const multiEmbedStart = Date.now();
       const skillEmbeddings = await embeddingService.generateMultipleEmbeddings(
@@ -53,6 +63,16 @@ export class HelperMatchingService {
         embeddings: skillEmbeddings.length,
         vectorLength: skillEmbeddings[0]?.length,
       });
+
+      if (extractedSkills.length > 0 && skillEmbeddings.length === 0) {
+        console.warn(
+          "⚠️  [HelperMatchingService] embeddings returned empty despite skills present; check normalization/duplicates",
+          {
+            skillsCount: extractedSkills.length,
+            firstSkill: extractedSkills[0],
+          }
+        );
+      }
 
       // Store the need with original text embedding if requesterId is provided
       const needEmbedStart = Date.now();

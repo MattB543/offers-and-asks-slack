@@ -2,6 +2,10 @@ import { App, ExpressReceiver } from "@slack/bolt";
 import express from "express";
 import { config } from "dotenv";
 import { db } from "./lib/database";
+import { SEARCH_CONFIG } from "./config/searchConfig";
+import { keywordSearchBridge } from "./services/keywordSearchBridge";
+import { hybridSearchService } from "./services/hybridSearch";
+import { rerankerBridge } from "./services/rerankerBridge";
 import { embeddingService, channelSummarizerService } from "./lib/openai";
 import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
@@ -535,7 +539,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     });
   }
 
-  // Embedding search API (now includes optional thread context)
+  // Hybrid search API (semantic + keyword, optional rerank, optional thread context)
   receiver.router.post("/api/search", express.json(), async (req, res) => {
     try {
       const configuredToken =
@@ -552,8 +556,15 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           return;
         }
       }
-      const { query, topK, channels, dateFrom, dateTo, includeThreads } =
-        req.body || {};
+      const {
+        query,
+        topK,
+        channels,
+        dateFrom,
+        dateTo,
+        includeThreads,
+        useReranking,
+      } = req.body || {};
       if (!query || typeof query !== "string") {
         res.status(400).json({ ok: false, error: "query_required" });
         return;
@@ -589,22 +600,115 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
            AND ($3::timestamptz IS NULL OR m.created_at >= $3)
            AND ($4::timestamptz IS NULL OR m.created_at <= $4)
          ORDER BY m.embedding <=> $1::vector ASC
-         LIMIT LEAST(COALESCE($5, 20), 100)`,
+         LIMIT LEAST(COALESCE($5, 50), 100)`,
         [
           `[${qEmbedding.join(",")}]`,
           Array.isArray(channels) && channels.length ? channels : null,
           dateFrom || null,
           dateTo || null,
-          topK || 20,
+          Math.max(Number(topK) || 20, SEARCH_CONFIG.hybrid.initialCandidates),
         ]
       );
 
-      const rows = result.rows as Array<any>;
+      const semanticRows = result.rows as Array<any>;
 
-      // If requested (default true), attach full thread context per result
+      // Prepare semantic list as [docId, score] where docId is `${channel_id}:${ts}`
+      const semanticList: Array<[string, number]> = semanticRows.map((r) => [
+        `${r.channel_id}:${r.ts}`,
+        Number(r.score) || 0,
+      ]);
+
+      // Keyword results via BM25 (Python bridge)
+      const keywordList = await keywordSearchBridge.search(
+        query,
+        SEARCH_CONFIG.bm25.topK
+      );
+
+      // Combine via RRF
+      const combined = hybridSearchService.reciprocalRankFusion(
+        semanticList,
+        keywordList,
+        {
+          k: SEARCH_CONFIG.hybrid.rrfK,
+          semanticWeight: SEARCH_CONFIG.hybrid.semanticWeight,
+        }
+      );
+
+      const finalTopK = Math.min(Number(topK) || 20, 50);
+      const topCombined = combined.slice(0, Math.max(finalTopK, 20));
+
+      // Fetch full rows for the combined ids
+      const idsByChannel = new Map<string, Set<string>>();
+      for (const [docId] of topCombined) {
+        const [cid, ts] = docId.split(":");
+        if (!cid || !ts) continue;
+        if (!idsByChannel.has(cid)) idsByChannel.set(cid, new Set());
+        idsByChannel.get(cid)!.add(ts);
+      }
+
+      const fetchedMap = new Map<string, any>();
+      for (const [cid, tsSet] of idsByChannel.entries()) {
+        const tsArray = Array.from(tsSet);
+        const fetched = await db.query(
+          `SELECT m.id,
+                  m.channel_id,
+                  m.channel_name,
+                  m.user_id,
+                  m.ts,
+                  m.thread_ts,
+                  m.parent_ts,
+                  m.is_reply,
+                  LEFT(m.text, 300) AS text,
+                  COALESCE(p.display_name, m.user_id) AS author
+           FROM slack_message m
+           LEFT JOIN LATERAL (
+             SELECT display_name
+             FROM people
+             WHERE slack_user_id = m.user_id
+             ORDER BY updated_at DESC NULLS LAST
+             LIMIT 1
+           ) p ON true
+           WHERE m.channel_id = $1 AND m.ts = ANY($2::text[])`,
+          [cid, tsArray]
+        );
+        for (const r of fetched.rows as any[]) {
+          fetchedMap.set(`${r.channel_id}:${r.ts}`, r);
+        }
+      }
+
+      // Order final results by combined score
+      let ordered = topCombined
+        .map(([docId, score]) => ({ row: fetchedMap.get(docId), score }))
+        .filter((x) => x.row);
+
+      // Optional reranking with cross-encoder
+      const shouldRerank =
+        (useReranking ?? SEARCH_CONFIG.reranker.enabledByDefault) === true;
+      if (shouldRerank && ordered.length > 0) {
+        try {
+          const reranked = await rerankerBridge.rerank(
+            query,
+            ordered.map((x) => x.row),
+            finalTopK
+          );
+          // Only use reranked if we got valid results
+          if (reranked && reranked.length > 0) {
+            ordered = reranked.map(({ index }) => ({
+              row: ordered[index].row,
+              score: ordered[index].score,
+            }));
+          }
+        } catch (e) {
+          console.error("Reranking failed, using hybrid results:", e);
+          // Continue with hybrid results if reranking fails
+        }
+      }
+
+      const rows = ordered.map((o) => o.row).slice(0, finalTopK);
+
+      // Include thread context if requested
       const shouldIncludeThreads = includeThreads !== false;
       if (!shouldIncludeThreads) {
-        // Still include computed thread_root_ts and in_thread flags for FE
         const mapped = rows.map((r) => ({
           ...r,
           thread_root_ts: r.thread_ts || r.parent_ts || r.ts,
@@ -614,7 +718,6 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         return;
       }
 
-      // Build a cache of threads keyed by channel_id:root_ts to avoid duplicate fetches
       const threadCache = new Map<string, any[]>();
       const enhanceWithThread = async (row: any): Promise<any> => {
         const rootTs: string = row.thread_ts || row.parent_ts || row.ts;

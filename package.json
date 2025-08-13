@@ -16,6 +16,8 @@
     "rebuild-person-skills": "ts-node src/jobs/rebuild-person-skills.ts",
     "audit-person-skills": "ts-node src/scripts/audit-person-skill-rebuild.ts",
     "backfill-message-embeddings": "ts-node src/scripts/backfill-message-embeddings.ts",
+    "build-search-index": "ts-node src/scripts/buildSearchIndex.ts",
+    "nightly-ingest": "ts-node src/scripts/nightlyIngest.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

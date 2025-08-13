@@ -122,6 +122,33 @@ CREATE INDEX IF NOT EXISTS idx_person_skills_skill_id ON person_skills(skill_id)
 CREATE INDEX IF NOT EXISTS idx_weekly_needs_week_start ON weekly_needs(week_start);
 CREATE INDEX IF NOT EXISTS idx_weekly_needs_user_id ON weekly_needs(user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS slack_channel_export_unique ON slack_channel_export(export_id, channel_id);
+-- Hybrid search helpers
+CREATE INDEX IF NOT EXISTS idx_slack_message_channel_ts ON slack_message(channel_id, ts);
+
+-- Track index state and pending updates
+CREATE TABLE IF NOT EXISTS index_state (
+  id SERIAL PRIMARY KEY,
+  index_type VARCHAR(50) NOT NULL,
+  last_full_rebuild TIMESTAMP,
+  last_incremental_update TIMESTAMP,
+  total_documents INTEGER,
+  pending_updates INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Track ingestion history
+CREATE TABLE IF NOT EXISTS ingestion_log (
+  id SERIAL PRIMARY KEY,
+  ingestion_timestamp TIMESTAMP NOT NULL,
+  messages_processed INTEGER,
+  messages_saved INTEGER,
+  index_updated BOOLEAN,
+  embeddings_created INTEGER,
+  processing_time_seconds FLOAT,
+  error_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 CREATE INDEX IF NOT EXISTS idx_slack_message_export ON slack_message(export_id);
 CREATE INDEX IF NOT EXISTS idx_slack_message_channel_export ON slack_message(channel_export_id);
 CREATE INDEX IF NOT EXISTS idx_slack_message_thread_ts ON slack_message(thread_ts);

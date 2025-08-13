@@ -120,6 +120,83 @@ export class Database {
     await this.pool.end();
   }
 
+  // Index metadata helpers
+  async upsertIndexMetadata(
+    indexType: string,
+    messageCount: number
+  ): Promise<void> {
+    await this.query(
+      `INSERT INTO index_metadata (index_type, last_updated, message_count)
+       VALUES ($1, now(), $2)
+       ON CONFLICT (index_type)
+       DO UPDATE SET last_updated = EXCLUDED.last_updated, message_count = EXCLUDED.message_count`,
+      [indexType, messageCount]
+    );
+  }
+
+  async updateIndexState(params: {
+    indexType: string;
+    fullRebuild?: boolean;
+    totalDocuments?: number | null;
+    pendingUpdates?: number | null;
+  }): Promise<void> {
+    const { indexType, fullRebuild, totalDocuments, pendingUpdates } = params;
+
+    // Ensure a row exists
+    await this.query(
+      `INSERT INTO index_state (index_type, last_full_rebuild, last_incremental_update, total_documents, pending_updates)
+       VALUES ($1, NULL, NULL, $2, $3)
+       ON CONFLICT DO NOTHING`,
+      [indexType, totalDocuments ?? null, pendingUpdates ?? null]
+    );
+
+    const parts: string[] = ["updated_at = now()"];
+    if (fullRebuild === true) parts.push("last_full_rebuild = now()");
+    else parts.push("last_incremental_update = now()");
+    if (typeof totalDocuments === "number")
+      parts.push(`total_documents = ${Number(totalDocuments)}`);
+    if (typeof pendingUpdates === "number")
+      parts.push(`pending_updates = ${Number(pendingUpdates)}`);
+
+    const setClause = parts.join(", ");
+    await this.query(
+      `UPDATE index_state SET ${setClause} WHERE index_type = $1`,
+      [indexType]
+    );
+  }
+
+  async logIngestionEvent(params: {
+    messagesProcessed: number;
+    messagesSaved: number;
+    indexUpdated: boolean;
+    embeddingsCreated?: number | null;
+    processingTimeSeconds?: number | null;
+    errorCount?: number | null;
+  }): Promise<void> {
+    const {
+      messagesProcessed,
+      messagesSaved,
+      indexUpdated,
+      embeddingsCreated = null,
+      processingTimeSeconds = null,
+      errorCount = 0,
+    } = params;
+    await this.query(
+      `INSERT INTO ingestion_log (
+         ingestion_timestamp, messages_processed, messages_saved,
+         index_updated, embeddings_created, processing_time_seconds, error_count
+       ) VALUES (now(), $1, $2, $3, $4, $5, $6)`,
+      [
+        messagesProcessed,
+        messagesSaved,
+        indexUpdated,
+        embeddingsCreated,
+        processingTimeSeconds,
+        errorCount,
+      ]
+    );
+  }
+
   // ============ Slack message embeddings ============
   async upsertSlackMessageEmbedding(
     messageId: number,

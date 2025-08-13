@@ -600,7 +600,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
            AND ($3::timestamptz IS NULL OR m.created_at >= $3)
            AND ($4::timestamptz IS NULL OR m.created_at <= $4)
          ORDER BY m.embedding <=> $1::vector ASC
-         LIMIT LEAST(COALESCE($5, 50), 100)`,
+         LIMIT LEAST(COALESCE($5, 100), 100)`,
         [
           `[${qEmbedding.join(",")}]`,
           Array.isArray(channels) && channels.length ? channels : null,
@@ -634,7 +634,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         }
       );
 
-      const finalTopK = Math.min(Number(topK) || 20, 50);
+      const finalTopK = Math.min(Number(topK) || 100, 100);
       const topCombined = combined.slice(0, Math.max(finalTopK, 20));
 
       // Fetch full rows for the combined ids

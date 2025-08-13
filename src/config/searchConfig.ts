@@ -2,7 +2,7 @@ export const SEARCH_CONFIG = {
   hybrid: {
     semanticWeight: 0.7,
     rrfK: 60,
-    initialCandidates: 50,
+    initialCandidates: 100,
   },
   reranker: {
     model: "rerank-v3.5",
@@ -12,7 +12,7 @@ export const SEARCH_CONFIG = {
   bm25: {
     indexPath: "./data/bm25_index.pkl",
     corpusJsonPath: "./data/bm25_corpus.json",
-    topK: 50,
+    topK: 100,
   },
   python: {
     // Override to a specific python executable if needed (e.g., 'py', 'python3')

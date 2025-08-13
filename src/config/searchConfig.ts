@@ -5,10 +5,9 @@ export const SEARCH_CONFIG = {
     initialCandidates: 50,
   },
   reranker: {
-    model: "BAAI/bge-reranker-v2-base",
-    batchSize: 32,
-    maxLength: 512,
+    model: "rerank-v3.5",
     enabledByDefault: true,
+    provider: "cohere",
   },
   bm25: {
     indexPath: "./data/bm25_index.pkl",

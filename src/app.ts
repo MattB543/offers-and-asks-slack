@@ -5,7 +5,7 @@ import { db } from "./lib/database";
 import { SEARCH_CONFIG } from "./config/searchConfig";
 import { keywordSearchBridge } from "./services/keywordSearchBridge";
 import { hybridSearchService } from "./services/hybridSearch";
-import { rerankerBridge } from "./services/rerankerBridge";
+import { cohereReranker } from "./services/cohereReranker";
 import { embeddingService, channelSummarizerService } from "./lib/openai";
 import { helperMatchingService, HelperSkill } from "./services/matching";
 import { errorHandler } from "./utils/errorHandler";
@@ -686,7 +686,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         (useReranking ?? SEARCH_CONFIG.reranker.enabledByDefault) === true;
       if (shouldRerank && ordered.length > 0) {
         try {
-          const reranked = await rerankerBridge.rerank(
+          const reranked = await cohereReranker.rerank(
             query,
             ordered.map((x) => x.row),
             finalTopK

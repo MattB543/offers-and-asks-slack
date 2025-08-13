@@ -601,7 +601,7 @@ export class ChannelSummarizerService {
   }): Promise<string> {
     const { searchQuery, threads, capturePrompt } = input;
 
-    const systemPrompt = [
+    let systemPrompt = [
       "You are summarizing Slack activity for a topic.",
       "You will receive a JSON dump of messages grouped by thread.",
       "Some messages may be irrelevant; ignore anything that does not help summarize the topic.",
@@ -609,6 +609,55 @@ export class ChannelSummarizerService {
       "Prefer clear, scannable phrasing. Avoid fluff. Group related points if helpful.",
       "Output only markdown text (bold text, a bulleted list, and optional sub-bullets). No code fences. No extra commentary.",
     ].join(" ");
+
+    systemPrompt += `
+    Here is an example of the output format:
+    
+    <example_output_format>
+    **DecisionMate (AI group decision tool)**
+  - Launched landing page and ran small ad test; 9 early-access signups (~1.5%) via Nuño’s tweet
+  - Prototype live and tested with multiple groups (2–7 ppl): https://decisionmate.fly.dev/
+  - External demos yielded positive interest; scoping v0.2 for team trials; planning backend with Kai and React frontend (Sofi)
+  - Insights:
+    - Meeting preparation may be a stronger initial use case than “make meetings faster”
+    - Voice input likely important; initial UI needs polish
+    - Parallel-convo facilitation UX explored (Convergent Facilitation overview UI concept)
+
+**Offers and Asks (Slack matching bot)**
+  - MVP live in Slack; DM the app with a need and it returns top 5 helpers based on skills/embeddings
+  - Announced in #demos; open-sourced: https://github.com/MattB543/offers-and-asks-slack
+  - Lightning talk feedback: consider clustering around readings/sources and surfacing “promising interactions,” not just perfect matches
+
+**Pivotal (multi-agent scheduling/coordination)**
+  - GitHub (early): https://github.com/cooperativetech/pivotal
+  - Scheduling app MVP: end-to-end works; going live; targets ~80–90% of utility in eval
+  - Related: group explored shared backend/infra with DecisionMate; two tracks hacking in parallel for now
+
+**AI Futures TTX (tabletop exercise)**
+  - Building MVP with Next.js/Partykit; basic infra + landing done; now implementing game lobby (names/roles/ready)
+  - Shifted mindset to “build the MVP now, polish later” after temporary slump
+  - Broader TTX engine progress (Alex van Grootel): stakeholders research, GM-LLM verified actions, world-state updates; UI WIP; planning benchmarking and multi-run workflows
+
+**Deep Future (AI scenario planning)**
+  - Landing page/branding WIP; shared copy and iterations; considering VC alpha test; interviews with scenario experts scheduled
+  - Technical exploration toward multi-agent scenario generation and storylets
+
+**SF OS (civic tech coordination platform)**
+  - Hackathon MVP won; demo links shared; meetings scheduled with SF Mayor’s Office and Board of Supervisors
+  - Open to integrating fellows’ coordination tools (e.g., matchmaking modules)
+
+**Community Notes / Fact-checking tools**
+  - AI community note writer pushing test notes to X; expanding to other platforms; analyzing common failure modes
+  - “Falseometer” launched (measures misleading statements); tested on pharma case; O3 performed best in catching technically-true-but-misleading claims
+
+**Fellows Flashcards**
+  - MVP built and shared: https://ai4hr-fellow-flashcards.vercel.app
+
+**Demo culture and timing**
+  - #demos channel activated to encourage frequent testing/feedback
+  - Demo Day tentatively around Oct 16 (aligned with Roots of Progress conf); some discussion on keeping it useful vs. hype
+    </example_output_format>
+    `;
 
     const userPayload = {
       search_query: searchQuery || null,

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://ai_claude:Incognito2020%40@offers-and-asks-slack-db-do-user-20541560-0.m.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+      ]
+    }
+  }
+}

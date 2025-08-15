@@ -18,6 +18,12 @@
     "backfill-message-embeddings": "ts-node src/scripts/backfill-message-embeddings.ts",
     "build-search-index": "ts-node src/scripts/buildSearchIndex.ts",
     "nightly-ingest": "ts-node src/scripts/nightlyIngest.ts",
+    "process-documents": "ts-node src/scripts/process-drive-documents.ts",
+    "process-documents-direct": "ts-node src/scripts/process-drive-documents-direct.ts",
+    "process-documents-force": "ts-node src/scripts/process-drive-documents.ts --force",
+    "test-document-parsing": "ts-node src/scripts/test-document-parsing.ts",
+    "inspect-document-storage": "ts-node src/scripts/inspect-document-storage.ts",
+    "test-hybrid-retrieval": "ts-node src/scripts/test-hybrid-retrieval.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -15,7 +15,11 @@
       "Bash(grep:*)",
       "Bash(npm run setup-db:*)",
       "Bash(mv:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(npm run process-documents:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm run test-hybrid-retrieval:*)"
     ],
     "deny": []
   }

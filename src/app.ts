@@ -541,7 +541,16 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
 
   // Hybrid search API (semantic + keyword, optional rerank, optional thread context)
   receiver.router.post("/api/search", express.json(), async (req, res) => {
+    const requestId = Math.random().toString(36).substring(2, 8);
+    const startTime = Date.now();
+    
+    console.log(`\n🔍 [${requestId}] === SEARCH API REQUEST START ===`);
+    console.log(`🔍 [${requestId}] Request timestamp: ${new Date().toISOString()}`);
+    console.log(`🔍 [${requestId}] Request origin: ${req.headers.origin || 'none'}`);
+    console.log(`🔍 [${requestId}] User-Agent: ${req.headers['user-agent']?.substring(0, 100) || 'none'}`);
+    
     try {
+      console.log(`🔐 [${requestId}] Checking authentication...`);
       const configuredToken =
         process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
       if (configuredToken) {
@@ -552,10 +561,15 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           ? authorizationHeader.substring("Bearer ".length)
           : undefined;
         if (!presentedToken || presentedToken !== configuredToken) {
+          console.log(`❌ [${requestId}] Authentication failed - invalid token`);
           res.status(401).json({ ok: false, error: "unauthorized" });
           return;
         }
+        console.log(`✅ [${requestId}] Authentication successful`);
+      } else {
+        console.log(`⚠️ [${requestId}] No authentication required (no token configured)`);
       }
+      console.log(`📋 [${requestId}] Parsing request body...`);
       const {
         query,
         topK,
@@ -564,12 +578,83 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         dateTo,
         includeThreads,
         useReranking,
+        sources,
+        useAdvancedRetrieval,
+        enableRecencyBoost,
+        enableContextExpansion,
+        includeDocumentSummaries,
       } = req.body || {};
+      
+      console.log(`📋 [${requestId}] Request parameters:`, {
+        query: query ? `"${query.substring(0, 100)}${query.length > 100 ? '...' : ''}"` : 'undefined',
+        topK: topK || 'default',
+        channels: channels?.length ? `${channels.length} channels` : 'all channels',
+        dateFrom,
+        dateTo,
+        includeThreads,
+        useReranking,
+        sources: sources || ['slack', 'document'],
+        useAdvancedRetrieval: useAdvancedRetrieval ?? false,
+        enableRecencyBoost: enableRecencyBoost ?? true,
+        enableContextExpansion: enableContextExpansion ?? true,
+        includeDocumentSummaries: includeDocumentSummaries ?? true,
+      });
+      
       if (!query || typeof query !== "string") {
+        console.log(`❌ [${requestId}] Invalid query parameter`);
         res.status(400).json({ ok: false, error: "query_required" });
         return;
       }
+      // Check if we should use the new unified search service
+      if (useAdvancedRetrieval || sources) {
+        console.log(`🚀 [${requestId}] Using advanced unified search service...`);
+        
+        // Import the unified search service
+        const { unifiedSearchService } = await import('./services/unifiedSearch');
+        
+        const searchOptions = {
+          sources: sources || ['slack', 'document'],
+          limit: Number(topK) || 20,
+          includeDocumentSummaries: includeDocumentSummaries ?? true,
+          rerank: useReranking ?? true,
+          useAdvancedRetrieval: useAdvancedRetrieval ?? false,
+          enableContextExpansion: enableContextExpansion ?? true,
+          enableRecencyBoost: enableRecencyBoost ?? true,
+        };
+        
+        console.log(`🔧 [${requestId}] Search options:`, searchOptions);
+        
+        const searchResults = await unifiedSearchService.search(query, searchOptions);
+        
+        console.log(`✅ [${requestId}] Unified search completed - ${searchResults.length} results`);
+        console.log(`📊 [${requestId}] Results by source:`, searchResults.reduce((acc, r) => {
+          acc[r.source] = (acc[r.source] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>));
+        
+        const duration = Date.now() - startTime;
+        console.log(`⏱️ [${requestId}] Total request duration: ${duration}ms`);
+        console.log(`🔍 [${requestId}] === SEARCH API REQUEST END ===\n`);
+        
+        res.json({ 
+          ok: true, 
+          results: searchResults,
+          meta: {
+            total: searchResults.length,
+            duration_ms: duration,
+            search_type: 'unified_advanced',
+            request_id: requestId
+          }
+        });
+        return;
+      }
+      
+      console.log(`🔄 [${requestId}] Using legacy search implementation...`);
+      console.log(`🧠 [${requestId}] Generating embeddings for query...`);
       const qEmbedding = await embeddingService.generateEmbedding(query);
+      console.log(`✅ [${requestId}] Embeddings generated (${qEmbedding.length} dimensions)`);
+      
+      console.log(`🗄️ [${requestId}] Executing semantic similarity query...`);
       const result = await db.query(
         `SELECT m.id,
                 m.channel_id,
@@ -611,20 +696,25 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
       );
 
       const semanticRows = result.rows as Array<any>;
+      console.log(`📊 [${requestId}] Semantic query returned ${semanticRows.length} results`);
 
-      // Prepare semantic list as [docId, score] where docId is `${channel_id}:${ts}`
+      // Prepare semantic list as [docId, score] where docId is `${channel_id}:${r.ts}`
       const semanticList: Array<[string, number]> = semanticRows.map((r) => [
         `${r.channel_id}:${r.ts}`,
         Number(r.score) || 0,
       ]);
+      console.log(`🔄 [${requestId}] Prepared semantic list: ${semanticList.length} items`);
 
       // Keyword results via BM25 (Python bridge)
+      console.log(`🔤 [${requestId}] Executing BM25 keyword search...`);
       const keywordList = await keywordSearchBridge.search(
         query,
         SEARCH_CONFIG.bm25.topK
       );
+      console.log(`📊 [${requestId}] BM25 search returned ${keywordList.length} results`);
 
       // Combine via RRF
+      console.log(`🔀 [${requestId}] Combining results with Reciprocal Rank Fusion...`);
       const combined = hybridSearchService.reciprocalRankFusion(
         semanticList,
         keywordList,
@@ -633,6 +723,9 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           semanticWeight: SEARCH_CONFIG.hybrid.semanticWeight,
         }
       );
+      console.log(`📊 [${requestId}] RRF combined ${combined.length} unique results`);
+      console.log(`🔧 [${requestId}] RRF config: k=${SEARCH_CONFIG.hybrid.rrfK}, semanticWeight=${SEARCH_CONFIG.hybrid.semanticWeight}`);
+      
 
       const finalTopK = Math.min(Number(topK) || 100, 100);
       const topCombined = combined.slice(0, Math.max(finalTopK, 20));

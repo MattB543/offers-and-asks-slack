@@ -686,16 +686,16 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         (useReranking ?? SEARCH_CONFIG.reranker.enabledByDefault) === true;
       if (shouldRerank && ordered.length > 0) {
         try {
-          const reranked = await cohereReranker.rerank(
+          const reranked = await cohereReranker.rerankSlackMessages(
             query,
             ordered.map((x) => x.row),
             finalTopK
           );
           // Only use reranked if we got valid results
           if (reranked && reranked.length > 0) {
-            ordered = reranked.map(({ index }) => ({
+            ordered = reranked.map(({ index, score }) => ({
               row: ordered[index].row,
-              score: ordered[index].score,
+              score: score,
             }));
           }
         } catch (e) {

@@ -28,6 +28,23 @@ export interface SearchResult {
     file_path?: string;
     has_code?: boolean;
     has_tables?: boolean;
+    
+    // Document expansion fields (for full document results)
+    total_chunks?: number;
+    highlighted_chunks?: number;
+    primary_chunk_id?: string;
+    chunks?: Array<{
+      id: string;
+      content: string;
+      order: number;
+      is_highlighted: boolean;
+      section_title?: string;
+      hierarchy_level?: number;
+      chunk_type?: string;
+      has_code?: boolean;
+      has_tables?: boolean;
+      score?: number;
+    }>;
   };
 }
 

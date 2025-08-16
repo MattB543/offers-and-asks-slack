@@ -861,7 +861,7 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     }
   });
 
-  // Summary API for a set of message IDs
+  // Unified Summary API for both Slack messages and document chunks
   receiver.router.post("/api/summarize", express.json(), async (req, res) => {
     try {
       const configuredToken =
@@ -878,64 +878,39 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           return;
         }
       }
-      const { messageIds, searchQuery } = req.body || {};
-      if (!Array.isArray(messageIds) || messageIds.length === 0) {
-        res.status(400).json({ ok: false, error: "messageIds_required" });
+      
+      // Accept both legacy messageIds and new resultIds format
+      const { messageIds, resultIds, searchQuery } = req.body || {};
+      const inputIds = resultIds || messageIds;
+      
+      if (!Array.isArray(inputIds) || inputIds.length === 0) {
+        res.status(400).json({ ok: false, error: "resultIds_or_messageIds_required" });
         return;
       }
-      const ids = messageIds
-        .map((x: any) => Number(x))
-        .filter((n: number) => Number.isFinite(n))
-        .slice(0, 100);
-      if (ids.length === 0) {
+      
+      // Separate Slack and document IDs
+      const slackIds: number[] = [];
+      const documentIds: string[] = [];
+      
+      for (const id of inputIds.slice(0, 100)) {
+        if (typeof id === 'string') {
+          if (id.startsWith('slack_')) {
+            const numId = Number(id.replace('slack_', ''));
+            if (Number.isFinite(numId)) slackIds.push(numId);
+          } else if (id.startsWith('doc_')) {
+            documentIds.push(id);
+          }
+        } else if (typeof id === 'number' && Number.isFinite(id)) {
+          // Legacy support for numeric message IDs
+          slackIds.push(id);
+        }
+      }
+      
+      if (slackIds.length === 0 && documentIds.length === 0) {
         res.status(400).json({ ok: false, error: "no_valid_ids" });
         return;
       }
-      // Fetch base info for the selected messages including channel + timing to resolve threads
-      const baseRowsRes = await db.query(
-        `SELECT m.id,
-                m.channel_id,
-                m.channel_name,
-                m.ts,
-                m.thread_ts,
-                m.parent_ts
-         FROM slack_message m
-         WHERE m.id = ANY($1::bigint[])`,
-        [ids]
-      );
-
-      const baseRows: Array<{
-        id: number;
-        channel_id: string;
-        channel_name: string | null;
-        ts: string;
-        thread_ts: string | null;
-        parent_ts: string | null;
-      }> = baseRowsRes.rows as any;
-
-      if (baseRows.length === 0) {
-        res.status(404).json({ ok: false, error: "messages_not_found" });
-        return;
-      }
-
-      // Determine unique threads to include (full context for each selected message)
-      const threadKeys = new Map<
-        string,
-        { channel_id: string; root_ts: string; channel_name: string | null }
-      >();
-      for (const r of baseRows) {
-        const rootTs = (r.thread_ts || r.parent_ts || r.ts) as string;
-        const key = `${r.channel_id}:${rootTs}`;
-        if (!threadKeys.has(key)) {
-          threadKeys.set(key, {
-            channel_id: r.channel_id,
-            root_ts: rootTs,
-            channel_name: r.channel_name,
-          });
-        }
-      }
-
-      // Fetch full thread messages for each unique thread
+      // Prepare content arrays
       const threads: Array<{
         channel_id: string;
         channel_name: string | null;
@@ -950,61 +925,297 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           text: string;
         }>;
       }> = [];
-
-      for (const tk of threadKeys.values()) {
-        const threadRes = await db.query(
+      
+      const documents: Array<{
+        document_id: string;
+        title: string;
+        file_path: string;
+        chunks: Array<{
+          id: string;
+          content: string;
+          section_title: string | null;
+          hierarchy_level: number;
+          order: number;
+        }>;
+      }> = [];
+      
+      // Process Slack messages if any
+      if (slackIds.length > 0) {
+        const baseRowsRes = await db.query(
           `SELECT m.id,
                   m.channel_id,
                   m.channel_name,
-                  m.user_id,
                   m.ts,
-                  LEFT(m.text, 4000) AS text,
-                  COALESCE(p.display_name, m.user_id) AS author
+                  m.thread_ts,
+                  m.parent_ts
            FROM slack_message m
-            LEFT JOIN LATERAL (
-              SELECT display_name
-              FROM people
-              WHERE slack_user_id = m.user_id
-              ORDER BY updated_at DESC NULLS LAST
-              LIMIT 1
-            ) p ON true
-           WHERE m.channel_id = $1
-             AND m.text IS NOT NULL
-             AND COALESCE(m.subtype,'') NOT IN (
-               'channel_join','channel_leave','bot_message','message_changed','message_deleted',
-               'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
-               'channel_archive','channel_unarchive','group_join','group_leave'
-             )
-             AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
-           ORDER BY m.ts ASC, m.id ASC`,
-          [tk.channel_id, tk.root_ts]
+           WHERE m.id = ANY($1::bigint[])`,
+          [slackIds]
         );
 
-        threads.push({
-          channel_id: tk.channel_id,
-          channel_name: tk.channel_name,
-          thread_root_ts: tk.root_ts,
-          messages: (threadRes.rows as any[]).map((m) => ({
-            id: m.id,
-            channel_id: m.channel_id,
-            channel_name: m.channel_name,
-            user_id: m.user_id,
-            author: m.author,
-            ts: m.ts,
-            text: m.text,
-          })),
-        });
+        const baseRows: Array<{
+          id: number;
+          channel_id: string;
+          channel_name: string | null;
+          ts: string;
+          thread_ts: string | null;
+          parent_ts: string | null;
+        }> = baseRowsRes.rows as any;
+
+        // Determine unique threads to include (full context for each selected message)
+        const threadKeys = new Map<
+          string,
+          { channel_id: string; root_ts: string; channel_name: string | null }
+        >();
+        for (const r of baseRows) {
+          const rootTs = (r.thread_ts || r.parent_ts || r.ts) as string;
+          const key = `${r.channel_id}:${rootTs}`;
+          if (!threadKeys.has(key)) {
+            threadKeys.set(key, {
+              channel_id: r.channel_id,
+              root_ts: rootTs,
+              channel_name: r.channel_name,
+            });
+          }
+        }
+
+        // Fetch full thread messages for each unique thread
+        for (const tk of threadKeys.values()) {
+          const threadRes = await db.query(
+            `SELECT m.id,
+                    m.channel_id,
+                    m.channel_name,
+                    m.user_id,
+                    m.ts,
+                    LEFT(m.text, 4000) AS text,
+                    COALESCE(p.display_name, m.user_id) AS author
+             FROM slack_message m
+              LEFT JOIN LATERAL (
+                SELECT display_name
+                FROM people
+                WHERE slack_user_id = m.user_id
+                ORDER BY updated_at DESC NULLS LAST
+                LIMIT 1
+              ) p ON true
+             WHERE m.channel_id = $1
+               AND m.text IS NOT NULL
+               AND m.user_id != 'U09934RTP4J'
+               AND COALESCE(m.subtype,'') NOT IN (
+                 'channel_join','channel_leave','bot_message','message_changed','message_deleted',
+                 'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
+                 'channel_archive','channel_unarchive','group_join','group_leave'
+               )
+               AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
+             ORDER BY m.ts ASC, m.id ASC`,
+            [tk.channel_id, tk.root_ts]
+          );
+
+          threads.push({
+            channel_id: tk.channel_id,
+            channel_name: tk.channel_name,
+            thread_root_ts: tk.root_ts,
+            messages: (threadRes.rows as any[]).map((m) => ({
+              id: m.id,
+              channel_id: m.channel_id,
+              channel_name: m.channel_name,
+              user_id: m.user_id,
+              author: m.author,
+              ts: m.ts,
+              text: m.text,
+            })),
+          });
+        }
+      }
+      
+      // Process documents if any
+      if (documentIds.length > 0) {
+        // Parse document IDs to determine what content to fetch
+        const docChunkIds: string[] = [];
+        const fullDocIds: string[] = [];
+        
+        for (const id of documentIds) {
+          if (id.startsWith('doc_chunk_')) {
+            docChunkIds.push(id.replace('doc_chunk_', ''));
+          } else if (id.startsWith('doc_')) {
+            fullDocIds.push(id.replace('doc_', ''));
+          }
+        }
+        
+        // Handle individual chunks (with context expansion for large doc)
+        if (docChunkIds.length > 0) {
+          const chunkRes = await db.query(`
+            SELECT 
+              de.id,
+              de.content,
+              de.section_title,
+              de.hierarchy_level,
+              de.document_id,
+              d.id as doc_id,
+              d.title as document_title,
+              d.file_path,
+              d.document_id as external_doc_id
+            FROM document_embeddings de
+            JOIN documents d ON de.document_id = d.id
+            WHERE de.id = ANY($1::int[])
+          `, [docChunkIds.map(id => parseInt(id))]);
+          
+          // Group chunks by document
+          const docGroups = new Map<string, any[]>();
+          for (const chunk of chunkRes.rows) {
+            const key = chunk.doc_id;
+            if (!docGroups.has(key)) {
+              docGroups.set(key, []);
+            }
+            docGroups.get(key)!.push(chunk);
+          }
+          
+          // For each document, fetch appropriate context
+          for (const [docId, chunks] of docGroups) {
+            const firstChunk = chunks[0];
+            const isLargeDoc = firstChunk.external_doc_id === 'ed6fe52043cf6e7c';
+            
+            if (isLargeDoc) {
+              // For large doc, get 10 chunks on either side of each relevant chunk
+              for (const chunk of chunks) {
+                const contextRes = await db.query(`
+                  SELECT 
+                    de.id,
+                    de.content,
+                    de.section_title,
+                    de.hierarchy_level,
+                    de.chunk_index
+                  FROM document_embeddings de
+                  WHERE de.document_id = $1
+                    AND de.chunk_index BETWEEN $2 AND $3
+                  ORDER BY de.chunk_index
+                `, [docId, Math.max(0, chunk.chunk_index - 10), chunk.chunk_index + 10]);
+                
+                documents.push({
+                  document_id: `doc_${docId}`,
+                  title: firstChunk.document_title,
+                  file_path: firstChunk.file_path,
+                  chunks: contextRes.rows.map((c: any, idx: number) => ({
+                    id: `chunk_${c.id}`,
+                    content: c.content,
+                    section_title: c.section_title,
+                    hierarchy_level: c.hierarchy_level,
+                    order: idx + 1
+                  }))
+                });
+              }
+            } else {
+              // For normal docs, get all chunks
+              const allChunksRes = await db.query(`
+                SELECT 
+                  de.id,
+                  de.content,
+                  de.section_title,
+                  de.hierarchy_level,
+                  de.chunk_index
+                FROM document_embeddings de
+                WHERE de.document_id = $1
+                ORDER BY de.chunk_index
+              `, [docId]);
+              
+              documents.push({
+                document_id: `doc_${docId}`,
+                title: firstChunk.document_title,
+                file_path: firstChunk.file_path,
+                chunks: allChunksRes.rows.map((c: any, idx: number) => ({
+                  id: `chunk_${c.id}`,
+                  content: c.content,
+                  section_title: c.section_title,
+                  hierarchy_level: c.hierarchy_level,
+                  order: idx + 1
+                }))
+              });
+            }
+          }
+        }
+        
+        // Handle full document IDs
+        if (fullDocIds.length > 0) {
+          for (const docId of fullDocIds) {
+            // Check if this is the large document
+            const docInfoRes = await db.query(`
+              SELECT document_id, title, file_path
+              FROM documents
+              WHERE id = $1
+            `, [parseInt(docId)]);
+            
+            if (docInfoRes.rows.length > 0) {
+              const docInfo = docInfoRes.rows[0];
+              const isLargeDoc = docInfo.document_id === 'ed6fe52043cf6e7c';
+              
+              if (isLargeDoc) {
+                // For large doc, just get first 30 chunks as sample
+                const chunksRes = await db.query(`
+                  SELECT 
+                    de.id,
+                    de.content,
+                    de.section_title,
+                    de.hierarchy_level,
+                    de.chunk_index
+                  FROM document_embeddings de
+                  WHERE de.document_id = $1
+                  ORDER BY de.chunk_index
+                  LIMIT 30
+                `, [parseInt(docId)]);
+                
+                documents.push({
+                  document_id: `doc_${docId}`,
+                  title: docInfo.title + ' (excerpt)',
+                  file_path: docInfo.file_path,
+                  chunks: chunksRes.rows.map((c: any, idx: number) => ({
+                    id: `chunk_${c.id}`,
+                    content: c.content,
+                    section_title: c.section_title,
+                    hierarchy_level: c.hierarchy_level,
+                    order: idx + 1
+                  }))
+                });
+              } else {
+                // Get all chunks for normal documents
+                const chunksRes = await db.query(`
+                  SELECT 
+                    de.id,
+                    de.content,
+                    de.section_title,
+                    de.hierarchy_level,
+                    de.chunk_index
+                  FROM document_embeddings de
+                  WHERE de.document_id = $1
+                  ORDER BY de.chunk_index
+                `, [parseInt(docId)]);
+                
+                documents.push({
+                  document_id: `doc_${docId}`,
+                  title: docInfo.title,
+                  file_path: docInfo.file_path,
+                  chunks: chunksRes.rows.map((c: any, idx: number) => ({
+                    id: `chunk_${c.id}`,
+                    content: c.content,
+                    section_title: c.section_title,
+                    hierarchy_level: c.hierarchy_level,
+                    order: idx + 1
+                  }))
+                });
+              }
+            }
+          }
+        }
       }
 
-      // Call improved summarizer to get markdown bullets
-      const markdown = await channelSummarizerService.summarizeTopicFromThreads(
+      // Call unified summarizer for both Slack and documents
+      const summary = await channelSummarizerService.summarizeUnifiedContent(
         {
           searchQuery: typeof searchQuery === "string" ? searchQuery : null,
           threads,
+          documents
         }
       );
 
-      res.json({ ok: true, summary: markdown, threads });
+      res.json({ ok: true, summary, threads, documents });
     } catch (e) {
       console.error("/api/summarize failed:", e);
       res.status(500).json({ ok: false, error: "internal_error" });

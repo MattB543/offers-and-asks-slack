@@ -84,6 +84,7 @@ export class HybridRetriever {
       }
 
       // Stage 6: Diversity and Context Expansion
+      console.log(`🔧 [HybridRetriever] Starting post-processing with ${rerankedResults.length} results, enableContextExpansion: ${enableContextExpansion}`);
       const finalResults = await this.postProcessResults(
         rerankedResults,
         query,
@@ -211,6 +212,7 @@ export class HybridRetriever {
       WHERE sm.embedding IS NOT NULL
         AND sm.text IS NOT NULL
         AND length(trim(sm.text)) > 10
+        AND sm.user_id != 'U09934RTP4J'  -- Filter out summary bot
       ORDER BY (sm.embedding <=> $1)
       LIMIT $2
     `, [JSON.stringify(embedding), limit]);
@@ -331,6 +333,7 @@ export class HybridRetriever {
         AND sm.text IS NOT NULL
         AND (sm.thread_ts IS NULL OR sm.ts = sm.thread_ts) -- Thread starters only
         AND length(trim(sm.text)) > 20
+        AND sm.user_id != 'U09934RTP4J'  -- Filter out summary bot
       ORDER BY sm.embedding <=> $1
       LIMIT $2
     `, [JSON.stringify(queryEmbedding), limit]);
@@ -474,44 +477,160 @@ export class HybridRetriever {
   ): Promise<SearchResult[]> {
     let processedResults = results;
 
-    // Ensure source diversity
-    processedResults = this.ensureSourceDiversity(processedResults);
+    // Sort purely by relevance score (no artificial source balancing)
+    processedResults = processedResults.sort((a, b) => b.score - a.score);
 
     // Context expansion if enabled
+    console.log(`🔧 [PostProcess] enableContextExpansion: ${enableContextExpansion}`);
     if (enableContextExpansion) {
+      console.log(`🔧 [PostProcess] Starting context expansion...`);
       processedResults = await this.expandContext(processedResults, query);
+    } else {
+      console.log(`🔧 [PostProcess] Context expansion disabled, skipping...`);
     }
 
     return processedResults.slice(0, finalK);
   }
 
-  private ensureSourceDiversity(results: SearchResult[]): SearchResult[] {
-    const diverse: SearchResult[] = [];
-    const sourceCount = { slack: 0, document: 0 };
-    const maxPerSource = Math.ceil(results.length / 2);
-
-    for (const result of results) {
-      if (sourceCount[result.source] < maxPerSource) {
-        diverse.push(result);
-        sourceCount[result.source]++;
-      }
-    }
-
-    // Fill remaining slots with any remaining results
-    for (const result of results) {
-      if (diverse.length >= results.length) break;
-      if (!diverse.some(r => r.id === result.id)) {
-        diverse.push(result);
-      }
-    }
-
-    return diverse;
-  }
+  // Removed ensureSourceDiversity - now using pure relevance ranking
 
   private async expandContext(results: SearchResult[], query: string): Promise<SearchResult[]> {
-    // For now, return results as-is
-    // This could be enhanced to include parent chunks, sibling sections, etc.
-    return results;
+    console.log(`🔧 [ExpandContext] Called with ${results.length} results for query: "${query}"`);
+    // Expand document chunks into full documents with highlighting
+    return await this.expandDocumentResults(results);
+  }
+
+  /**
+   * Transform individual document chunks into full documents with highlighting info
+   */
+  private async expandDocumentResults(results: SearchResult[]): Promise<SearchResult[]> {
+    const documentChunks = results.filter(r => r.source === 'document');
+    const slackResults = results.filter(r => r.source === 'slack');
+    
+    console.log(`🔧 [DocumentExpansion] Processing ${results.length} results: ${documentChunks.length} docs, ${slackResults.length} slack`);
+    
+    if (documentChunks.length === 0) {
+      console.log(`🔧 [DocumentExpansion] No documents to expand, returning original results`);
+      return results; // No documents to expand
+    }
+
+    // Group chunks by document
+    const documentGroups = new Map<string, {
+      chunks: SearchResult[];
+      documentId: string;
+      documentTitle: string;
+      filePath: string;
+    }>();
+
+    for (const chunk of documentChunks) {
+      // Extract document ID from chunk ID (format: doc_chunk_123)
+      const chunkId = chunk.id.replace('doc_chunk_', '');
+      
+      // Get document info from chunk metadata
+      const documentKey = chunk.metadata.document_title + '|' + chunk.metadata.file_path;
+      
+      if (!documentGroups.has(documentKey)) {
+        documentGroups.set(documentKey, {
+          chunks: [],
+          documentId: '', // We'll get this from the database
+          documentTitle: chunk.metadata.document_title || '',
+          filePath: chunk.metadata.file_path || ''
+        });
+      }
+      
+      documentGroups.get(documentKey)!.chunks.push(chunk);
+    }
+
+    const expandedDocuments: SearchResult[] = [];
+
+    // For each document group, fetch all chunks and create full document result
+    console.log(`🔧 [DocumentExpansion] Created ${documentGroups.size} document groups`);
+    
+    for (const [documentKey, group] of documentGroups) {
+      try {
+        console.log(`🔧 [DocumentExpansion] Processing document: ${documentKey} with ${group.chunks.length} chunks`);
+        
+        // Get all chunks for this document, ordered by hierarchy
+        const allChunksResult = await db.query(`
+          SELECT 
+            de.id,
+            de.content,
+            de.section_title,
+            de.hierarchy_level,
+            de.chunk_type,
+            de.has_code,
+            de.has_tables,
+            d.id as document_id,
+            d.title as document_title,
+            d.file_path
+          FROM document_embeddings de
+          JOIN documents d ON de.document_id = d.id
+          WHERE d.title = $1 
+            AND d.file_path = $2
+            AND de.source_type = 'document'
+            AND length(trim(de.content)) > 10
+          ORDER BY de.hierarchy_level ASC, de.id ASC
+        `, [group.documentTitle, group.filePath]);
+
+        if (allChunksResult.rows.length === 0) continue;
+
+        const allChunks = allChunksResult.rows;
+        const documentId = allChunks[0].document_id;
+        const highlightedChunkIds = new Set(
+          group.chunks.map(c => c.id.replace('doc_chunk_', ''))
+        );
+
+        // Find the highest scoring chunk to use as the primary result
+        const primaryChunk = group.chunks.reduce((best, current) => 
+          current.score > best.score ? current : best
+        );
+
+        // Create chunks array with highlighting info
+        const chunks = allChunks.map((chunk: any, index: number) => ({
+          id: `chunk_${chunk.id}`,
+          content: chunk.content,
+          order: index + 1,
+          is_highlighted: highlightedChunkIds.has(chunk.id.toString()),
+          section_title: chunk.section_title,
+          hierarchy_level: chunk.hierarchy_level,
+          chunk_type: chunk.chunk_type,
+          has_code: chunk.has_code,
+          has_tables: chunk.has_tables,
+          score: highlightedChunkIds.has(chunk.id.toString()) ? 
+            group.chunks.find(c => c.id === `doc_chunk_${chunk.id}`)?.score || 0 : 0
+        }));
+
+        // Create full document result
+        const documentResult: SearchResult = {
+          id: `doc_${documentId}`,
+          content: chunks.map((c: any) => c.content).join('\n\n'), // Full document content
+          score: primaryChunk.score,
+          source: 'document' as const,
+          metadata: {
+            title: group.documentTitle,
+            document_title: group.documentTitle,
+            file_path: group.filePath,
+            total_chunks: chunks.length,
+            highlighted_chunks: chunks.filter((c: any) => c.is_highlighted).length,
+            primary_chunk_id: primaryChunk.id.replace('doc_chunk_', ''),
+            created_at: primaryChunk.metadata.created_at,
+            // Add chunks array for FE reconstruction
+            chunks: chunks
+          }
+        };
+
+        expandedDocuments.push(documentResult);
+
+      } catch (error) {
+        console.error(`❌ Failed to expand document: ${documentKey}`, error);
+        // Fallback to original chunk results
+        expandedDocuments.push(...group.chunks);
+      }
+    }
+
+    // Combine expanded documents with Slack results and sort by score
+    const combinedResults = [...expandedDocuments, ...slackResults];
+    return combinedResults.sort((a, b) => b.score - a.score);
   }
 
   /**

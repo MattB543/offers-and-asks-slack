@@ -651,6 +651,158 @@ export class ChannelSummarizerService {
     // Return as-is; caller expects markdown
     return content;
   }
+
+  /**
+   * Unified summarization for both Slack threads and documents
+   */
+  async summarizeUnifiedContent(input: {
+    searchQuery?: string | null;
+    threads: Array<{
+      channel_id: string;
+      channel_name?: string | null;
+      thread_root_ts: string;
+      messages: Array<{
+        id: number;
+        channel_id: string;
+        channel_name?: string | null;
+        user_id: string;
+        author: string;
+        ts: string;
+        text: string;
+      }>;
+    }>;
+    documents: Array<{
+      document_id: string;
+      title: string;
+      file_path: string;
+      chunks: Array<{
+        id: string;
+        content: string;
+        section_title: string | null;
+        hierarchy_level: number;
+        order: number;
+      }>;
+    }>;
+    capturePrompt?: (type: string, content: string) => void;
+  }): Promise<string> {
+    const { searchQuery, threads, documents, capturePrompt } = input;
+    
+    // Enhanced system prompt for unified content
+    let systemPrompt = [
+      "You are summarizing search results that include both Slack conversations and document content.",
+      "Goal: create a comprehensive, well-organized summary that synthesizes information from both sources.",
+      "Structure your output as HTML with clear sections for different types of content.",
+      "Use <strong> for headings, <ul>/<li> for lists, and <em> for emphasis.",
+      "Include names from Slack conversations and document titles.",
+      "Focus on actionable insights, key findings, and important discussions related to the search query.",
+      "If content from documents and Slack relates to the same topic, synthesize them together.",
+      "Prioritize relevance to the search query and avoid redundant information."
+    ].join(" ");
+
+    // Build unified content payload
+    const contentSections = [];
+    
+    // Add Slack conversations
+    if (threads.length > 0) {
+      contentSections.push({
+        type: "slack_conversations",
+        count: threads.length,
+        data: threads.map((t) => ({
+          channel_id: t.channel_id,
+          channel_name: t.channel_name ?? null,
+          thread_root_ts: t.thread_root_ts,
+          messages: t.messages.map((m) => ({
+            id: m.id,
+            ts: m.ts,
+            user_id: m.user_id,
+            author: m.author,
+            text: m.text,
+          })),
+        }))
+      });
+    }
+    
+    // Add documents
+    if (documents.length > 0) {
+      contentSections.push({
+        type: "documents",
+        count: documents.length,
+        data: documents.map((d) => ({
+          document_id: d.document_id,
+          title: d.title,
+          file_path: d.file_path,
+          content: d.chunks.map(c => c.content).join('\n\n'),
+          sections: d.chunks.map(c => ({
+            section_title: c.section_title,
+            hierarchy_level: c.hierarchy_level,
+            content: c.content
+          }))
+        }))
+      });
+    }
+
+    const userPayload = {
+      search_query: searchQuery || null,
+      content_summary: {
+        total_slack_threads: threads.length,
+        total_documents: documents.length,
+        has_mixed_content: threads.length > 0 && documents.length > 0
+      },
+      sections: contentSections,
+      guidance: {
+        synthesize_related_content: true,
+        focus_on_search_query: !!searchQuery,
+        include_actionable_insights: true,
+        output_format: "structured_html"
+      }
+    };
+
+    const composed = `System Prompt\n\n${systemPrompt}\n\nUser Payload (JSON)\n\n${JSON.stringify(
+      userPayload, null, 2
+    )}`;
+
+    capturePrompt?.("system", systemPrompt);
+    capturePrompt?.("user", JSON.stringify(userPayload, null, 2));
+
+    try {
+      const response = await this.openai.responses.create({
+        model: "gpt-5",
+        reasoning: { effort: "medium" }, // Higher effort for complex synthesis
+        input: composed,
+        temperature: 0.8,
+        max_output_tokens: 15000, // More tokens for comprehensive summaries
+      });
+
+      const content = (response as any).output_text?.trim() || "";
+      
+      // Return structured HTML summary
+      return content;
+    } catch (error) {
+      console.error("Unified summarization failed:", error);
+      
+      // Fallback: create basic summary
+      const fallbackSummary = [];
+      
+      if (searchQuery) {
+        fallbackSummary.push(`<div><strong>Search Results for "${searchQuery}"</strong></div>`);
+      }
+      
+      if (documents.length > 0) {
+        fallbackSummary.push(`<div><strong>📄 Documents (${documents.length})</strong><ul>`);
+        documents.forEach(doc => {
+          fallbackSummary.push(`<li><strong>${doc.title}</strong> - ${doc.chunks.length} sections</li>`);
+        });
+        fallbackSummary.push(`</ul></div>`);
+      }
+      
+      if (threads.length > 0) {
+        const messageCount = threads.reduce((sum, t) => sum + t.messages.length, 0);
+        fallbackSummary.push(`<div><strong>💬 Slack Discussions (${messageCount} messages across ${threads.length} threads)</strong></div>`);
+      }
+      
+      return fallbackSummary.join('\n');
+    }
+  }
 }
 
 export const channelSummarizerService = new ChannelSummarizerService();

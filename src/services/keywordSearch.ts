@@ -71,6 +71,7 @@ export class KeywordSearchService {
         WHERE sm.ts_vector @@ plainto_tsquery('english', $1)
           AND sm.text IS NOT NULL
           AND length(trim(sm.text)) > 10
+          AND sm.user_id != 'U09934RTP4J'  -- Filter out summary bot
         ORDER BY ts_rank DESC, sm.created_at DESC
         LIMIT $2
       `, [query, limit]);

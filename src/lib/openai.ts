@@ -644,7 +644,7 @@ export class ChannelSummarizerService {
       reasoning: { effort: "low" },
       input: composed,
       temperature: 1,
-      max_output_tokens: 10000,
+      max_output_tokens: 100000,
     });
 
     const content = (response as any).output_text?.trim() || "";
@@ -686,58 +686,133 @@ export class ChannelSummarizerService {
     capturePrompt?: (type: string, content: string) => void;
   }): Promise<string> {
     const { searchQuery, threads, documents, capturePrompt } = input;
-    
+
+    console.log("🔍 [UnifiedSummary] Starting summarization", {
+      searchQuery,
+      threadCount: threads.length,
+      documentCount: documents.length,
+    });
+
     // Enhanced system prompt for unified content
     let systemPrompt = [
       "You are summarizing search results that include both Slack conversations and document content.",
-      "Goal: create a comprehensive, well-organized summary that synthesizes information from both sources.",
-      "Structure your output as HTML with clear sections for different types of content.",
+      "Goal: create a well-organized summary that synthesizes information from both sources.",
+      "Structure your output as HTML with clear sections for different sections of the summary.",
       "Use <strong> for headings, <ul>/<li> for lists, and <em> for emphasis.",
-      "Include names from Slack conversations and document titles.",
+      "Include all names (first name, last initial like Matt B) from Slack conversations, but do not include document titles",
       "Focus on actionable insights, key findings, and important discussions related to the search query.",
-      "If content from documents and Slack relates to the same topic, synthesize them together.",
-      "Prioritize relevance to the search query and avoid redundant information."
+      "Synthesize content from Slack and documents together, so that the summary is grouped by topic",
+      "Only include information in the summary that is directly related to the search query. Avoid redundant or unrelated information.",
+      "Include a high level executive summary at the top, which bullets the different topics / sections of the summary. Do not include names in the executive summary.",
     ].join(" ");
 
-    // Build unified content payload
     const contentSections = [];
-    
-    // Add Slack conversations
+    let totalSlackChars = 0;
+    let totalDocChars = 0;
+
+    // Add Slack conversations (NO LIMITS - include all content)
     if (threads.length > 0) {
-      contentSections.push({
-        type: "slack_conversations",
-        count: threads.length,
-        data: threads.map((t) => ({
-          channel_id: t.channel_id,
-          channel_name: t.channel_name ?? null,
-          thread_root_ts: t.thread_root_ts,
-          messages: t.messages.map((m) => ({
+      console.log(
+        "📱 [UnifiedSummary] Processing Slack threads:",
+        threads.length
+      );
+
+      const slackData = threads.map((t) => {
+        const threadMessages = t.messages.map((m) => {
+          totalSlackChars += m.text.length;
+          return {
             id: m.id,
             ts: m.ts,
             user_id: m.user_id,
             author: m.author,
-            text: m.text,
-          })),
-        }))
+            text: m.text, // No truncation
+          };
+        });
+
+        return {
+          channel_id: t.channel_id,
+          channel_name: t.channel_name ?? null,
+          thread_root_ts: t.thread_root_ts,
+          messages: threadMessages,
+        };
+      });
+
+      contentSections.push({
+        type: "slack_conversations",
+        count: threads.length,
+        data: slackData,
+      });
+
+      console.log("📱 [UnifiedSummary] Slack content processed", {
+        totalThreads: threads.length,
+        totalMessages: threads.reduce((sum, t) => sum + t.messages.length, 0),
+        totalSlackChars,
       });
     }
-    
-    // Add documents
+
+    // Add documents (limit to 3 chunks before and after each selected chunk)
     if (documents.length > 0) {
-      contentSections.push({
-        type: "documents",
-        count: documents.length,
-        data: documents.map((d) => ({
+      console.log(
+        "📄 [UnifiedSummary] Processing documents:",
+        documents.length
+      );
+
+      const docData = documents.map((d) => {
+        console.log(`📄 [UnifiedSummary] Processing document: ${d.title}`, {
+          totalChunks: d.chunks.length,
+        });
+
+        // For documents, only include 3 chunks before and after the selected chunks
+        // If we have chunks from search results, we assume they were already selected
+        // So we'll take all provided chunks plus 3 before and after each
+        let selectedChunks = d.chunks;
+
+        // If we have more than 7 chunks (3 before + 1 selected + 3 after),
+        // we'll take the middle section to stay focused
+        if (d.chunks.length > 7) {
+          const midIndex = Math.floor(d.chunks.length / 2);
+          const startIndex = Math.max(0, midIndex - 3);
+          const endIndex = Math.min(d.chunks.length, midIndex + 4); // +4 to include 3 after
+          selectedChunks = d.chunks.slice(startIndex, endIndex);
+        }
+
+        selectedChunks.forEach((c) => {
+          totalDocChars += c.content.length;
+        });
+
+        console.log(`📄 [UnifiedSummary] Document "${d.title}" processed`, {
+          originalChunks: d.chunks.length,
+          selectedChunks: selectedChunks.length,
+          docChars: selectedChunks.reduce(
+            (sum, c) => sum + c.content.length,
+            0
+          ),
+        });
+
+        return {
           document_id: d.document_id,
           title: d.title,
           file_path: d.file_path,
-          content: d.chunks.map(c => c.content).join('\n\n'),
-          sections: d.chunks.map(c => ({
+          content: selectedChunks.map((c) => c.content).join("\n\n"),
+          sections: selectedChunks.map((c) => ({
             section_title: c.section_title,
             hierarchy_level: c.hierarchy_level,
-            content: c.content
-          }))
-        }))
+            content: c.content,
+          })),
+          total_chunks: d.chunks.length,
+          chunks_included: selectedChunks.length,
+        };
+      });
+
+      contentSections.push({
+        type: "documents",
+        count: documents.length,
+        data: docData,
+      });
+
+      console.log("📄 [UnifiedSummary] Documents content processed", {
+        totalDocuments: documents.length,
+        totalDocChars,
       });
     }
 
@@ -746,20 +821,39 @@ export class ChannelSummarizerService {
       content_summary: {
         total_slack_threads: threads.length,
         total_documents: documents.length,
-        has_mixed_content: threads.length > 0 && documents.length > 0
+        has_mixed_content: threads.length > 0 && documents.length > 0,
+        total_slack_chars: totalSlackChars,
+        total_doc_chars: totalDocChars,
       },
       sections: contentSections,
       guidance: {
         synthesize_related_content: true,
         focus_on_search_query: !!searchQuery,
         include_actionable_insights: true,
-        output_format: "structured_html"
-      }
+        output_format: "structured_html",
+        content_note:
+          "All Slack content included without truncation. Document content limited to 3 chunks before and after selected chunks.",
+      },
     };
 
     const composed = `System Prompt\n\n${systemPrompt}\n\nUser Payload (JSON)\n\n${JSON.stringify(
-      userPayload, null, 2
+      userPayload,
+      null,
+      2
     )}`;
+
+    const finalPromptChars = composed.length;
+
+    console.log("🎯 [UnifiedSummary] Final prompt prepared", {
+      totalSlackChars,
+      totalDocChars,
+      finalPromptChars,
+      promptSizeKB: Math.round(finalPromptChars / 1024),
+      slackToDocRatio:
+        totalDocChars > 0
+          ? Math.round((totalSlackChars / totalDocChars) * 100) / 100
+          : "∞",
+    });
 
     capturePrompt?.("system", systemPrompt);
     capturePrompt?.("user", JSON.stringify(userPayload, null, 2));
@@ -767,40 +861,50 @@ export class ChannelSummarizerService {
     try {
       const response = await this.openai.responses.create({
         model: "gpt-5",
-        reasoning: { effort: "medium" }, // Higher effort for complex synthesis
+        reasoning: { effort: "low" }, // Low effort for quick synthesis
         input: composed,
-        temperature: 0.8,
-        max_output_tokens: 15000, // More tokens for comprehensive summaries
+        max_output_tokens: 50000, // More tokens for comprehensive summaries
       });
 
       const content = (response as any).output_text?.trim() || "";
-      
+
       // Return structured HTML summary
       return content;
     } catch (error) {
       console.error("Unified summarization failed:", error);
-      
+
       // Fallback: create basic summary
       const fallbackSummary = [];
-      
+
       if (searchQuery) {
-        fallbackSummary.push(`<div><strong>Search Results for "${searchQuery}"</strong></div>`);
+        fallbackSummary.push(
+          `<div><strong>Search Results for "${searchQuery}"</strong></div>`
+        );
       }
-      
+
       if (documents.length > 0) {
-        fallbackSummary.push(`<div><strong>📄 Documents (${documents.length})</strong><ul>`);
-        documents.forEach(doc => {
-          fallbackSummary.push(`<li><strong>${doc.title}</strong> - ${doc.chunks.length} sections</li>`);
+        fallbackSummary.push(
+          `<div><strong>📄 Documents (${documents.length})</strong><ul>`
+        );
+        documents.forEach((doc) => {
+          fallbackSummary.push(
+            `<li><strong>${doc.title}</strong> - ${doc.chunks.length} sections</li>`
+          );
         });
         fallbackSummary.push(`</ul></div>`);
       }
-      
+
       if (threads.length > 0) {
-        const messageCount = threads.reduce((sum, t) => sum + t.messages.length, 0);
-        fallbackSummary.push(`<div><strong>💬 Slack Discussions (${messageCount} messages across ${threads.length} threads)</strong></div>`);
+        const messageCount = threads.reduce(
+          (sum, t) => sum + t.messages.length,
+          0
+        );
+        fallbackSummary.push(
+          `<div><strong>💬 Slack Discussions (${messageCount} messages across ${threads.length} threads)</strong></div>`
+        );
       }
-      
-      return fallbackSummary.join('\n');
+
+      return fallbackSummary.join("\n");
     }
   }
 }

@@ -1222,6 +1222,150 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     }
   });
 
+  // Extended Search API - combines search with context expansion
+  receiver.router.post("/api/extended-search", express.json(), async (req, res) => {
+    const requestId = Math.random().toString(36).substring(2, 8);
+    const startTime = Date.now();
+    
+    try {
+      // Authentication check
+      const configuredToken = process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as string | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ") 
+          ? authorizationHeader.substring("Bearer ".length) 
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const { query, sources = ['slack', 'document'] } = req.body || {};
+      
+      if (!query || typeof query !== "string") {
+        res.status(400).json({ ok: false, error: "query_required" });
+        return;
+      }
+
+      console.log(`🚀 [${requestId}] Extended search for: "${query}"`);
+
+      // Get top 100 results using unified search
+      const { unifiedSearchService } = await import('./services/unifiedSearch');
+      const searchResults = await unifiedSearchService.search(query, {
+        sources,
+        limit: 100,
+        includeDocumentSummaries: false,
+        rerank: true,
+        useAdvancedRetrieval: true,
+        enableContextExpansion: false,
+        enableRecencyBoost: true,
+      });
+
+      // Separate results by source
+      const slackResults = searchResults.filter(r => r.source === 'slack');
+      const documentResults = searchResults.filter(r => r.source === 'document');
+      
+      console.log(`📊 [${requestId}] ${slackResults.length} Slack, ${documentResults.length} docs`);
+
+      // Expand Slack context
+      const expandedSlackContext = [];
+      for (const slackResult of slackResults) {
+        const messageId = parseInt(slackResult.id.replace('slack_', ''));
+        
+        // Get original message
+        const messageRes = await db.query(
+          `SELECT id, channel_id, channel_name, ts, thread_ts, parent_ts, text, user_id
+           FROM slack_message WHERE id = $1`, [messageId]);
+        
+        if (messageRes.rows.length === 0) continue;
+        const msg = messageRes.rows[0];
+        
+        // Get thread context
+        const threadRootTs = msg.thread_ts || msg.parent_ts || msg.ts;
+        const threadRes = await db.query(
+          `SELECT id, user_id, ts, text FROM slack_message 
+           WHERE channel_id = $1 AND (ts = $2 OR parent_ts = $2 OR thread_ts = $2)
+           AND text IS NOT NULL ORDER BY ts ASC`,
+          [msg.channel_id, threadRootTs]);
+
+        // Get surrounding messages (5 before, 5 after)
+        const surroundingRes = await db.query(
+          `(SELECT id, user_id, ts, text, 'before' as position FROM slack_message 
+            WHERE channel_id = $1 AND ts < $2 AND text IS NOT NULL 
+            ORDER BY ts DESC LIMIT 5)
+           UNION ALL
+           (SELECT id, user_id, ts, text, 'after' as position FROM slack_message 
+            WHERE channel_id = $1 AND ts > $2 AND text IS NOT NULL 
+            ORDER BY ts ASC LIMIT 5)
+           ORDER BY ts ASC`,
+          [msg.channel_id, msg.ts]);
+
+        expandedSlackContext.push({
+          original_match: slackResult,
+          thread_context: threadRes.rows,
+          surrounding_context: surroundingRes.rows,
+          channel_info: { channel_id: msg.channel_id, channel_name: msg.channel_name }
+        });
+      }
+
+      // Expand document context
+      const expandedDocumentContext = [];
+      for (const docResult of documentResults) {
+        const chunkId = parseInt(docResult.id.replace('doc_chunk_', ''));
+        
+        // Get chunk and document info
+        const chunkRes = await db.query(
+          `SELECT de.id, de.content, de.section_title, de.chunk_index, de.document_id, 
+                  d.title, d.file_path
+           FROM document_embeddings de JOIN documents d ON de.document_id = d.id
+           WHERE de.id = $1`, [chunkId]);
+        
+        if (chunkRes.rows.length === 0) continue;
+        const chunk = chunkRes.rows[0];
+        
+        // Get 3 chunks on either side
+        const expandedChunksRes = await db.query(
+          `SELECT id, content, section_title, chunk_index
+           FROM document_embeddings 
+           WHERE document_id = $1 AND chunk_index BETWEEN $2 AND $3
+           ORDER BY chunk_index`,
+          [chunk.document_id, Math.max(0, chunk.chunk_index - 3), chunk.chunk_index + 3]);
+
+        expandedDocumentContext.push({
+          original_match: docResult,
+          document_info: { title: chunk.title, file_path: chunk.file_path },
+          expanded_chunks: expandedChunksRes.rows.map((c: any, idx: number) => ({
+            ...c,
+            is_original_match: c.id === chunkId,
+            order: idx + 1
+          }))
+        });
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ [${requestId}] Extended search completed in ${duration}ms`);
+
+      res.json({
+        ok: true,
+        query,
+        total_results: searchResults.length,
+        slack_contexts: expandedSlackContext,
+        document_contexts: expandedDocumentContext,
+        meta: {
+          duration_ms: duration,
+          request_id: requestId,
+          original_slack_results: slackResults.length,
+          original_document_results: documentResults.length
+        }
+      });
+
+    } catch (e) {
+      console.error(`❌ [${requestId}] /api/extended-search failed:`, e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
   // Channels API for FE filters
   receiver.router.get("/api/channels", async (req, res) => {
     try {

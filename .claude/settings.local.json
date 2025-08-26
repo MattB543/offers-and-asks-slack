@@ -19,8 +19,12 @@
       "Bash(node:*)",
       "Bash(npm run process-documents:*)",
       "Bash(npx ts-node:*)",
-      "Bash(npm run test-hybrid-retrieval:*)"
+      "Bash(npm run test-hybrid-retrieval:*)",
+      "WebSearch",
+      "Bash(npm run migrate-links:*)",
+      "Bash(npm run test-links-tables:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }

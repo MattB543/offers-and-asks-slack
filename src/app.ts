@@ -12,6 +12,9 @@ import { errorHandler } from "./utils/errorHandler";
 import { sendWeeklyPrompts } from "./jobs/weekly-prompt";
 import { UserService } from "./services/users";
 import { oauthService } from "./services/oauth";
+import { linkExtractionService } from "./services/linkExtractionService";
+import { linkDatabaseService } from "./services/linkDatabaseService";
+import { linkProcessingWorker } from "./workers/linkProcessingWorker";
 
 config();
 
@@ -421,6 +424,42 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
           } catch (e) {
             console.warn(
               "⚠️ Auto-embed of ingested messages failed (continuing):",
+              e
+            );
+          }
+
+          // Post-commit: extract links from newly inserted messages
+          try {
+            console.log(`🔗 Extracting links from ${(insertedMessages || []).length} messages...`);
+            let totalLinksExtracted = 0;
+            
+            for (const message of insertedMessages || []) {
+              if (message.text && message.text.trim().length > 0) {
+                // Look up the full message data to get channel name and user
+                const messageDetails = await db.query(
+                  'SELECT channel_name, user_name FROM slack_message WHERE id = $1',
+                  [message.id]
+                );
+                
+                if (messageDetails.rows.length > 0) {
+                  const { channel_name, user_name } = messageDetails.rows[0];
+                  const linksFound = await linkExtractionService.processMessageLinks(
+                    message.id.toString(),
+                    message.text,
+                    channel_name || 'unknown',
+                    user_name || 'unknown'
+                  );
+                  totalLinksExtracted += linksFound;
+                }
+              }
+            }
+            
+            if (totalLinksExtracted > 0) {
+              console.log(`✅ Extracted ${totalLinksExtracted} links from messages`);
+            }
+          } catch (e) {
+            console.warn(
+              "⚠️ Link extraction from ingested messages failed (continuing):",
               e
             );
           }
@@ -1399,9 +1438,10 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
     }
   });
 
-  // Links extraction API
+  // Links API - Enhanced with AI processing and semantic search
   receiver.router.get("/api/links", async (req, res) => {
     try {
+      // Authentication check
       const configuredToken =
         process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
       if (configuredToken) {
@@ -1417,103 +1457,285 @@ if (process.env.SLACK_CLIENT_ID && process.env.SLACK_CLIENT_SECRET) {
         }
       }
 
+      // Parse query parameters
       const {
-        channel_id,
-        user_id,
-        dateFrom,
-        dateTo,
+        search,
+        channel_name,
+        domain,
+        status,
         limit,
         offset,
-        includeThreads,
+        date_from,
+        date_to,
+        min_message_count,
+        include_messages,
+        stats_only
       } = req.query as Record<string, string | undefined>;
-      const lim = Math.min(parseInt(limit || "500", 10) || 500, 2000);
-      const off = Math.max(parseInt(offset || "0", 10) || 0, 0);
 
-      const result = await db.query(
-        `SELECT m.id AS message_id,
-                m.channel_id,
-                m.channel_name,
-                m.user_id,
-                 COALESCE(p.display_name, m.user_id) AS author,
-                m.ts,
-                m.thread_ts,
-                m.parent_ts,
-                rm[1] AS url
-         FROM slack_message m
-          LEFT JOIN LATERAL (
-            SELECT display_name
-            FROM people
-            WHERE slack_user_id = m.user_id
-            ORDER BY updated_at DESC NULLS LAST
-            LIMIT 1
-          ) p ON true
-         CROSS JOIN LATERAL regexp_matches(m.text, '(https?://[^\\s>|]+)', 'g') rm
-         WHERE m.text IS NOT NULL
-           AND COALESCE(m.subtype,'') NOT IN (
-             'channel_join','channel_leave','bot_message','message_changed','message_deleted',
-             'thread_broadcast','file_share','channel_topic','channel_purpose','channel_name',
-             'channel_archive','channel_unarchive','group_join','group_leave'
-           )
-           AND ($1::text IS NULL OR m.channel_id = $1)
-           AND ($2::text IS NULL OR m.user_id = $2)
-           AND ($3::timestamptz IS NULL OR m.created_at >= $3)
-           AND ($4::timestamptz IS NULL OR m.created_at <= $4)
-         ORDER BY m.id DESC
-         LIMIT $5 OFFSET $6`,
-        [
-          channel_id || null,
-          user_id || null,
-          dateFrom || null,
-          dateTo || null,
-          lim,
-          off,
-        ]
-      );
-
-      const linkRows = (result.rows as any[]).map((r) => ({
-        ...r,
-        thread_root_ts: r.thread_ts || r.parent_ts || r.ts,
-        in_thread: Boolean(r.thread_ts || r.parent_ts),
-      }));
-
-      const shouldIncludeThreads = includeThreads === "true";
-      if (!shouldIncludeThreads) {
-        res.json({ ok: true, links: linkRows });
+      // Return stats only if requested
+      if (stats_only === "true") {
+        const stats = await linkDatabaseService.getLinkStats();
+        res.json({ ok: true, stats });
         return;
       }
 
-      // Include optional thread context for each link result (may be heavy)
-      const threadCache = new Map<string, any[]>();
-      const withThreads = [] as any[];
-      for (const row of linkRows) {
-        const rootTs: string = row.thread_root_ts;
-        const key = `${row.channel_id}:${rootTs}`;
-        if (!threadCache.has(key)) {
-          const threadRes = await db.query(
-            `SELECT m.id,
-                    m.channel_id,
-                    m.channel_name,
-                    m.user_id,
-                    m.ts,
-                    LEFT(m.text, 1000) AS text,
-                    COALESCE(p.display_name, m.user_id) AS author
-             FROM slack_message m
-             LEFT JOIN people p ON p.slack_user_id = m.user_id
-             WHERE m.channel_id = $1
-               AND m.text IS NOT NULL
-               AND COALESCE(m.subtype, '') <> 'channel_join'
-               AND (m.ts = $2 OR m.parent_ts = $2 OR m.thread_ts = $2)
-             ORDER BY m.ts ASC, m.id ASC`,
-            [row.channel_id, rootTs]
-          );
-          threadCache.set(key, threadRes.rows);
+      // Parse numeric parameters
+      const lim = Math.min(parseInt(limit || "50", 10) || 50, 200);
+      const off = Math.max(parseInt(offset || "0", 10) || 0, 0);
+      const minMsgCount = min_message_count ? parseInt(min_message_count, 10) : undefined;
+
+      // Parse dates
+      let dateRange: { start?: Date; end?: Date } | undefined;
+      if (date_from || date_to) {
+        dateRange = {};
+        if (date_from) {
+          dateRange.start = new Date(date_from);
         }
-        withThreads.push({ ...row, thread: threadCache.get(key) });
+        if (date_to) {
+          dateRange.end = new Date(date_to);
+        }
       }
 
-      res.json({ ok: true, links: withThreads });
+      // Build search options
+      const options = {
+        limit: lim,
+        offset: off,
+        status: status as 'pending' | 'processing' | 'completed' | 'failed' | undefined,
+        domain,
+        channelName: channel_name,
+        minMessageCount: minMsgCount,
+        includeRecentMessages: include_messages === "true",
+        dateRange
+      };
+
+      let result;
+      
+      // Perform semantic search if query provided, otherwise chronological
+      if (search && search.trim().length > 0) {
+        console.log(`🔍 Link semantic search: "${search}"`);
+        result = await linkDatabaseService.searchLinksSemanticSearch(search, options);
+      } else {
+        result = await linkDatabaseService.getLinksChronological(options);
+      }
+
+      // Format response to match expected structure
+      const formattedLinks = result.links.map(link => ({
+        id: link.id,
+        url: link.url,
+        domain: link.domain,
+        title: link.title,
+        description: link.description,
+        site_name: link.siteName,
+        summary: link.summary,
+        word_count: link.wordCount,
+        message_count: link.messageCount,
+        processing_status: link.processingStatus,
+        first_seen_at: link.firstSeenAt,
+        last_seen_at: link.lastSeenAt,
+        relevance_score: link.relevanceScore,
+        user_name: link.user_name,
+        channel_name: link.channel_name,
+        slack_message: link.slack_message,
+        recent_messages: link.recentMessages
+      }));
+
+      res.json({
+        ok: true,
+        links: formattedLinks,
+        pagination: {
+          total: result.total,
+          offset: off,
+          limit: lim,
+          has_more: result.hasMore
+        },
+        search_type: search ? "semantic" : "chronological"
+      });
+
     } catch (e) {
       console.error("/api/links failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Link statistics API
+  receiver.router.get("/api/links/stats", async (req, res) => {
+    try {
+      // Authentication check
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const [linkStats, workerStatus] = await Promise.all([
+        linkDatabaseService.getLinkStats(),
+        linkProcessingWorker.getStatus()
+      ]);
+
+      res.json({
+        ok: true,
+        stats: {
+          // Link processing stats
+          links: {
+            total: linkStats.totalLinks,
+            completed: linkStats.completedLinks,
+            pending: linkStats.pendingLinks,
+            failed: linkStats.failedLinks,
+            recent_activity: linkStats.recentActivity,
+            top_domains: linkStats.topDomains.slice(0, 10)
+          },
+          // Worker performance stats
+          worker: {
+            is_running: workerStatus.isRunning,
+            total_processed: workerStatus.metrics.totalProcessed,
+            success_rate: workerStatus.metrics.successRate,
+            processing_rate: workerStatus.metrics.processingRate,
+            average_processing_time: workerStatus.metrics.averageProcessingTime,
+            uptime_ms: workerStatus.metrics.uptime
+          }
+        }
+      });
+
+    } catch (e) {
+      console.error("/api/links/stats failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Individual link details API
+  receiver.router.get("/api/links/:id", async (req, res) => {
+    try {
+      // Authentication check
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const linkId = parseInt(req.params.id, 10);
+      if (isNaN(linkId)) {
+        res.status(400).json({ ok: false, error: "invalid_link_id" });
+        return;
+      }
+
+      const link = await linkDatabaseService.getLinkById(linkId);
+      if (!link) {
+        res.status(404).json({ ok: false, error: "link_not_found" });
+        return;
+      }
+
+      res.json({
+        ok: true,
+        link: {
+          id: link.id,
+          url: link.url,
+          domain: link.domain,
+          title: link.title,
+          description: link.description,
+          site_name: link.siteName,
+          summary: link.summary,
+          word_count: link.wordCount,
+          message_count: link.messageCount,
+          processing_status: link.processingStatus,
+          first_seen_at: link.firstSeenAt,
+          last_seen_at: link.lastSeenAt,
+          user_name: link.user_name,
+          channel_name: link.channel_name,
+          recent_messages: link.recentMessages
+        }
+      });
+
+    } catch (e) {
+      console.error("/api/links/:id failed:", e);
+      res.status(500).json({ ok: false, error: "internal_error" });
+    }
+  });
+
+  // Link reprocessing API
+  receiver.router.post("/api/links/reprocess", async (req, res) => {
+    try {
+      // Authentication check
+      const configuredToken =
+        process.env.EXTERNAL_POST_BEARER_TOKEN || process.env.BEARER_TOKEN;
+      if (configuredToken) {
+        const authorizationHeader = req.headers["authorization"] as
+          | string
+          | undefined;
+        const presentedToken = authorizationHeader?.startsWith("Bearer ")
+          ? authorizationHeader.substring("Bearer ".length)
+          : undefined;
+        if (!presentedToken || presentedToken !== configuredToken) {
+          res.status(401).json({ ok: false, error: "unauthorized" });
+          return;
+        }
+      }
+
+      const { link_ids, status_filter } = req.body;
+
+      let linksToReprocess: number[] = [];
+
+      if (link_ids && Array.isArray(link_ids)) {
+        // Specific link IDs provided
+        linksToReprocess = link_ids.filter((id: any) => !isNaN(parseInt(id, 10)));
+      } else if (status_filter) {
+        // Reprocess links by status (e.g., all failed links)
+        const result = await db.query(
+          'SELECT id FROM links WHERE processing_status = $1 LIMIT 50',
+          [status_filter]
+        );
+        linksToReprocess = result.rows.map((row: any) => row.id);
+      } else {
+        res.status(400).json({ 
+          ok: false, 
+          error: "must_provide_link_ids_or_status_filter" 
+        });
+        return;
+      }
+
+      if (linksToReprocess.length === 0) {
+        res.json({
+          ok: true,
+          message: "no_links_to_reprocess",
+          reprocessed: 0
+        });
+        return;
+      }
+
+      // Reset processing status to pending for reprocessing
+      await db.query(
+        'UPDATE links SET processing_status = $1, error_message = NULL WHERE id = ANY($2)',
+        ['pending', linksToReprocess]
+      );
+
+      console.log(`🔄 Manually reprocessing ${linksToReprocess.length} links`);
+
+      res.json({
+        ok: true,
+        message: `queued_${linksToReprocess.length}_links_for_reprocessing`,
+        reprocessed: linksToReprocess.length,
+        link_ids: linksToReprocess
+      });
+
+    } catch (e) {
+      console.error("/api/links/reprocess failed:", e);
       res.status(500).json({ ok: false, error: "internal_error" });
     }
   });

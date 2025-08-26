@@ -3,6 +3,7 @@ import { app } from "./app";
 import { db } from "./lib/database";
 import { embeddingService } from "./lib/openai";
 import { errorHandler } from "./utils/errorHandler";
+import { linkProcessingWorker } from "./workers/linkProcessingWorker";
 
 console.log("🚀 Server file loaded");
 console.log("🚀 Current working directory:", process.cwd());
@@ -65,6 +66,11 @@ class Server {
 
       // Job scheduler is disabled - manual mode only
       console.log("📅 Job scheduler: DISABLED (manual weekly prompts via admin button)");
+
+      // Start link processing worker
+      console.log("🔗 Starting link processing worker...");
+      linkProcessingWorker.start();
+      console.log("✅ Link processing worker started");
 
       // Notify admin that server started
       await errorHandler.notifyAdmin(
@@ -168,6 +174,11 @@ class Server {
     console.log("🛑 Stop timestamp:", new Date().toISOString());
 
     try {
+      // Stop link processing worker
+      console.log("🛑 Stopping link processing worker...");
+      linkProcessingWorker.stop();
+      console.log("🔗 Link processing worker stopped");
+
       // Stop Slack app
       console.log("🛑 Stopping Slack app...");
       await app.stop();

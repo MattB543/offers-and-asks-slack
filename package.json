@@ -22,27 +22,40 @@
     "process-documents-direct": "ts-node src/scripts/process-drive-documents-direct.ts",
     "process-documents-force": "ts-node src/scripts/process-drive-documents.ts --force",
     "test-document-parsing": "ts-node src/scripts/test-document-parsing.ts",
+    "regenerate-summaries": "node dist/scripts/regenerate-summaries-batch.js",
+    "regenerate-summaries-full": "node dist/scripts/regenerate-summaries-full.js",
     "inspect-document-storage": "ts-node src/scripts/inspect-document-storage.ts",
     "test-hybrid-retrieval": "ts-node src/scripts/test-hybrid-retrieval.ts",
+    "test-link-processing": "ts-node src/scripts/test-link-processing.ts",
+    "migrate-links": "ts-node src/scripts/run-links-migration.ts",
+    "test-links-tables": "ts-node src/scripts/test-links-tables.ts",
+    "backfill-historical-links": "ts-node src/scripts/backfill-historical-links.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^24.2.0",
     "@types/pg": "^8.15.5",
+    "@types/turndown": "^5.0.5",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "@slack/bolt": "^4.4.0",
     "@slack/web-api": "^7.5.0",
+    "axios": "^1.11.0",
     "bree": "^9.2.4",
     "dotenv": "^17.2.1",
     "fast-csv": "^5.0.5",
+    "jsdom": "^26.1.0",
     "openai": "^5.11.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "turndown": "^7.2.1",
+    "unfurl": "^0.1.0"
   }
 }

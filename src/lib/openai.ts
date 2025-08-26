@@ -538,6 +538,50 @@ Rules:
     const result = normalizeToBullets(content).trim();
     return result || content;
   }
+
+  /**
+   * Generate AI summary for web content
+   */
+  async generateSummary(
+    content: string,
+    title?: string,
+    url?: string
+  ): Promise<string> {
+    try {
+      const maxContentLength = 10000;
+      const truncatedContent =
+        content.length > maxContentLength
+          ? content.substring(0, maxContentLength) + "..."
+          : content;
+
+      const prompt = `Please provide a concise one-paragraph summary (2-3 sentences) of the following web content. Focus on the main points and key information that would be useful for someone searching through messages.
+
+${title ? `Title: ${title}\n` : ""}${url ? `URL: ${url}\n` : ""}
+Content:
+${truncatedContent}
+
+Summary:`;
+
+      const completion = await this.openai.chat.completions.create({
+        model: "gpt-5-mini",
+        reasoning_effort: "low",
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const summary = completion.choices[0]?.message?.content?.trim();
+      if (!summary) {
+        throw new Error("No summary generated");
+      }
+
+      return summary;
+    } catch (error) {
+      console.warn("⚠️ Failed to generate summary:", error);
+      return `Content from ${url || "webpage"}: ${content.substring(
+        0,
+        200
+      )}...`;
+    }
+  }
 }
 
 export const embeddingService = new EmbeddingService();
